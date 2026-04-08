@@ -1,0 +1,3 @@
+Primeiro extraimos os nomes do site do próprio IBGE para fazer o préprocessamento/anonimato das nomes presentes
+nas descrições dos chamados pelos funcionaros públicos e organizamos em um .txt para a remoção de todos os nomes
+dentro dessa base de dados
