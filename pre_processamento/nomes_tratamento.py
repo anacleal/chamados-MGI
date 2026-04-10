@@ -1,8 +1,8 @@
 import pandas as pd
 
-arquivo_fem = "ibge-fem-10000.csv"
-arquivo_masc = "ibge-mas-10000.csv"
-arquivo_saida = "nomes_formatados.txt"
+arquivo_fem = "../data/ibge-fem-10000.csv"
+arquivo_masc = "../data/ibge-mas-10000.csv"
+arquivo_saida = "../data/nomes_formatados.txt"
 
 df_fem = pd.read_csv(arquivo_fem, header=None, encoding="utf-8")
 df_masc = pd.read_csv(arquivo_masc, header=None, encoding="utf-8")

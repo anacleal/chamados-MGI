@@ -7,8 +7,8 @@ from unidecode import unidecode
 
 # ntlk.download('stopwords')
 
-entrada_csv = "tabela_teste.csv"
-entrada_nomes_formatados = "nomes_formatados.txt"
+entrada_csv = "../data/DESIN2025.csv"
+entrada_nomes_formatados = "../data/nomes_formatados.txt"
 
 # lower e tirar acento
 def normalize(text):
@@ -19,17 +19,17 @@ def stopwords_formatadas():
   stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
   stopwords_pt.discard("nao")
   stopwords_pt.discard("sem")
-  stopwords_pt.add("prezad")
   return stopwords_pt
 
 #pega todos os nomes da base do ibge
 def nomes_formatados():
   with open(entrada_nomes_formatados, "r", encoding="utf-8") as f:
     nomes = {normalize(nome.strip()) for nome in f if nome.strip()}
+
   return nomes
 
 #mascara da base de dados
-df = pd.read_csv(entrada_csv, encoding="utf-8")
+df = pd.read_csv(entrada_csv, encoding="utf-8", low_memory=False)
 
 #colunas da base
 labels = [
@@ -48,23 +48,30 @@ def preprocess(text):
   # normaliza o texto
   text = normalize(text)
   # remove URLs
-  text = re.sub(r'http\S+|www\S+', '', text)
+  text = re.sub(r'http\S+|www\S+', ' ', text)
   # remove pontuação
-  text = re.sub(r'[^\w\s]', '', text)
-
+  text = re.sub(r'[^\w\s]', ' ', text) 
   
   tokens = text.split()
   resultado = []
+
   for token in tokens:
         # remove stopwords
-        if token in stopwords_pt:
-            continue
+        if token in stopwords_pt or token.startswith("prezad"):
+          continue
+
         #tokeniza os nomes
-        elif token in nomes:
+        if token in nomes:
            resultado.append("[nome]")
+           continue
+        
         #se não for token só da append
-        else: 
+        if any(char.isdigit() for char in token):
+           token_num = re.sub(r'\d', 'X', token)
+           resultado.append(token_num)
+        else:
            resultado.append(token)
+
   return " ".join(resultado).strip()
 
 
@@ -73,4 +80,4 @@ for coluna in labels:
     if coluna in df.columns:
         df[coluna_clean] = df[coluna].apply(lambda x: preprocess(x))
 
-df.to_csv("DESIN2025_clean.csv", index=False, encoding="utf-8")
+df.to_csv("../data/DESIN2025_clean.csv", index=False, encoding="utf-8")
