@@ -17,15 +17,20 @@ def normalize(text):
 #lista de stopwords normalizadas
 def stopwords_formatadas():
   stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
-  stopwords_pt.discard("nao")
-  stopwords_pt.discard("sem")
+  stopwords_pt.add("ola")
+  stopwords_pt.add("oi")
+  stopwords_pt.add("saudacoes")
+  stopwords_pt.add("senhores")
+  stopwords_pt.add("senhoras")
+  stopwords_pt.add("cordialmente")
+  stopwords_pt.add("att")
+  stopwords_pt.add("atenciosamente")
   return stopwords_pt
 
 #pega todos os nomes da base do ibge
 def nomes_formatados():
   with open(entrada_nomes_formatados, "r", encoding="utf-8") as f:
     nomes = {normalize(nome.strip()) for nome in f if nome.strip()}
-
   return nomes
 
 #mascara da base de dados
@@ -45,6 +50,9 @@ stopwords_pt = stopwords_formatadas()
 
 
 def preprocess(text):
+  #remover valores nulos
+  if pd.isna(text): return ""
+
   # normaliza o texto
   text = normalize(text)
   # remove URLs
@@ -56,6 +64,11 @@ def preprocess(text):
   resultado = []
 
   for token in tokens:
+        
+        if token == "nao":
+            resultado.append("nao")
+            continue
+        
         # remove stopwords
         if token in stopwords_pt or token.startswith("prezad"):
           continue
