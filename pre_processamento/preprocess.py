@@ -1,96 +1,112 @@
 import re
 import pandas as pd
-import numpy as np
-import nltk
-from nltk.corpus import stopwords
 from unidecode import unidecode
+from nltk.corpus import stopwords
+#import nltk
 
-# ntlk.download('stopwords')
+#nltk.download('stopwords', quiet=True)
 
-entrada_csv = "../data/DESIN2025.csv"
-entrada_nomes_formatados = "../data/nomes_formatados.txt"
-
-# lower e tirar acento
 def normalize(text):
-  return unidecode(str(text).lower())
+    #lower e tira acentos
+    return unidecode(str(text).lower())
 
-#lista de stopwords normalizadas
-def stopwords_formatadas():
-  stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
-  stopwords_pt.add("ola")
-  stopwords_pt.add("oi")
-  stopwords_pt.add("saudacoes")
-  stopwords_pt.add("senhores")
-  stopwords_pt.add("senhoras")
-  stopwords_pt.add("cordialmente")
-  stopwords_pt.add("att")
-  stopwords_pt.add("atenciosamente")
-  return stopwords_pt
+def get_stopwords_formatadas():
+    #lista de stopwords normalizadas
+    stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
+    custom_stops = ["ola", "oi", "saudacoes", "senhores", "senhoras", "cordialmente", "att", "atenciosamente", "id"]
+    stopwords_pt.update(custom_stops)
+    return stopwords_pt
 
-#pega todos os nomes da base do ibge
-def nomes_formatados():
-  with open(entrada_nomes_formatados, "r", encoding="utf-8") as f:
-    nomes = {normalize(nome.strip()) for nome in f if nome.strip()}
-  return nomes
-
-#mascara da base de dados
-df = pd.read_csv(entrada_csv, encoding="utf-8", low_memory=False)
-
-#colunas da base
-labels = [
-  "Titulo",
-  "Descrição do chamado",
-  "Última ação de acompanhamento",
-  "Título da ultima ação padrão"
-]
-
-#inicialização variaveis
-nomes = nomes_formatados()
-stopwords_pt = stopwords_formatadas()
+def load_nomes_formatados(file_path):
+    #carrega os nomes normalizados da base de dados do ibge
+    with open(file_path, "r", encoding="utf-8") as f:
+        nomes = {normalize(nome.strip()) for nome in f if nome.strip()}
+    return nomes
 
 
-def preprocess(text):
-  #remover valores nulos
-  if pd.isna(text): return ""
+def preprocess_text(text, stopwords_pt, nomes):
+    #limpa e tokeniza o texto, e limpa os nomes e numeros
+    if pd.isna(text): return ""
 
-  # normaliza o texto
-  text = normalize(text)
-  # remove URLs
-  text = re.sub(r'http\S+|www\S+', ' ', text)
-  # remove pontuação
-  text = re.sub(r'[^\w\s]', ' ', text) 
-  
-  tokens = text.split()
-  resultado = []
+    text = normalize(text)
+    # remove URLs
+    text = re.sub(r'http\S+|www\S+', ' ', text)
+    # remove pontuação
+    text = re.sub(r'[^\w\s]', ' ', text)
 
-  for token in tokens:
-        
+    tokens = text.split()
+    resultado = []
+
+    for token in tokens:
         if token == "nao":
             resultado.append("nao")
             continue
-        
+
         # remove stopwords
-        if token in stopwords_pt or token.startswith("prezad"):
-          continue
+        if token in stopwords_pt or token.startswith("prezad") or token.startswith("servidor"):
+            continue
 
-        #tokeniza os nomes
+        # tokeniza os nomes
         if token in nomes:
-           resultado.append("[nome]")
-           continue
-        
-        #se não for token só da append
+            resultado.append("[nome]")
+            continue
+
+        # substitui os numeros por X
         if any(char.isdigit() for char in token):
-           token_num = re.sub(r'\d', 'X', token)
-           resultado.append(token_num)
+            continue
+
         else:
-           resultado.append(token)
+            resultado.append(token)
 
-  return " ".join(resultado).strip()
+    return " ".join(resultado).strip()
 
+def run_preprocessing(input_path, names_path, output_clean_path):
+    # execucao pra main
+    df = pd.read_csv(input_path, encoding="utf-8", low_memory=False)
 
-for coluna in labels:
-    coluna_clean = f"{coluna}_clean"
-    if coluna in df.columns:
-        df[coluna_clean] = df[coluna].apply(lambda x: preprocess(x))
+    # normaliza o titulo das colunas
+    cols_originais = df.columns
+    normalized_cols_map = {normalize(col): col for col in cols_originais}
 
-df.to_csv("../data/DESIN2025_clean.csv", index=False, encoding="utf-8")
+    labels_to_process = [
+        "titulo",
+        "descricao do chamado",
+        "ultima acao de acompanhamento",
+        "titulo da ultima acao padrao"
+    ]
+
+    nomes = load_nomes_formatados(names_path)
+    stopwords_pt = get_stopwords_formatadas()
+
+    processed_cols = []
+    for label in labels_to_process:
+        if label in normalized_cols_map:
+            original_col = normalized_cols_map[label]
+            col_clean = f"{original_col}"
+            print(f"Processando coluna: {original_col}")
+            df[col_clean] = df[original_col].apply(lambda x: preprocess_text(x, stopwords_pt, nomes))
+            processed_cols.append(col_clean)
+        else:
+            print(f"Aviso: Coluna correspondente a '{label}' não encontrada no CSV.")
+
+    # Save full CSV
+    # df.to_csv(output_full_path, index=False, encoding="utf-8")
+
+    # Save only processed columns
+    if processed_cols:
+        df[processed_cols].to_csv(output_clean_path, index=False, encoding="utf-8")
+        print(f"Arquivos salvos:\n - {output_clean_path}")
+    else:
+        print("Nenhuma coluna foi processada.")
+
+if __name__ == "__main__":
+    # Defina aqui os caminhos dos seus arquivos
+    INPUT_CSV = "../data/DESIN2025.csv"
+    NAMES_FILE = "../data/nomes_formatados.txt"
+    OUTPUT_CLEAN = "../data/data_pre_processed.csv"
+
+    run_preprocessing(
+        input_path=INPUT_CSV,
+        names_path=NAMES_FILE,
+        output_clean_path=OUTPUT_CLEAN
+    )
