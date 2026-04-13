@@ -92,7 +92,6 @@ def run_preprocessing(input_path, names_path, output_clean_path):
     # Save full CSV
     # df.to_csv(output_full_path, index=False, encoding="utf-8")
 
-    # Save only processed columns
     if processed_cols:
         df[processed_cols].to_csv(output_clean_path, index=False, encoding="utf-8")
         print(f"Arquivos salvos:\n - {output_clean_path}")

@@ -1,4 +1,4 @@
 /.venv
-/data/DESIN2025.csv
-/nomes_formatados.txt
-/data/DESIN2025_clean.csv
+/data
+/lista_de_nomes/ibge-data
+/topic_modeling/bertopic_graphs
