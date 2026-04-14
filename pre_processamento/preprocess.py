@@ -51,7 +51,7 @@ def preprocess_text(text, stopwords_pt, nomes):
             resultado.append("[nome]")
             continue
 
-        # substitui os numeros por X
+        # remove os numeros
         if any(char.isdigit() for char in token):
             continue
 
@@ -88,9 +88,6 @@ def run_preprocessing(input_path, names_path, output_clean_path):
             processed_cols.append(col_clean)
         else:
             print(f"Aviso: Coluna correspondente a '{label}' não encontrada no CSV.")
-
-    # Save full CSV
-    # df.to_csv(output_full_path, index=False, encoding="utf-8")
 
     if processed_cols:
         df[processed_cols].to_csv(output_clean_path, index=False, encoding="utf-8")
