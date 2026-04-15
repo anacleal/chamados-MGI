@@ -2,3 +2,7 @@
 /data
 /lista_de_nomes/ibge-data
 /topic_modeling/bertopic_graphs
+/topic_modeling/model
+/graficos
+/bertopic_resultados
+/data/.idea
