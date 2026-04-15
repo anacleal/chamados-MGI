@@ -11,7 +11,7 @@ def encurtar_nome(nome, limite=30):
 # ==========================================
 # 1. CARREGAR E PREPARAR DADOS
 # ==========================================
-arquivo = "Planilha Chamados MGI.xlsx"
+arquivo = "graphs_ade/Planilha Chamados MGI.xlsx"
 df = pd.read_excel(arquivo)
 
 # Aplicar encurtamento nos nomes dos times
@@ -50,7 +50,7 @@ sns.lineplot(data=temporal.sort_values(['Ano', 'Mês']), x='Data', y='Quantidade
 plt.title("Abertura Mensal de Chamados")
 plt.xticks(rotation=45)
 plt.tight_layout()
-plt.savefig('01_evolucao_temporal.png')
+plt.savefig('graphs_ade/01_evolucao_temporal.png')
 
 # ==========================================
 # 3. TOP 10 TIMES (VOLUME)
@@ -62,7 +62,7 @@ sns.barplot(x=top_times.values, y=top_times.index, palette='viridis')
 plt.title("Top 10 times por volume de demanda")
 plt.xlabel("Total de chamados")
 plt.tight_layout()
-plt.savefig('02_top_10_times.png')
+plt.savefig('graphs_ade/02_top_10_times.png')
 
 # ==========================================
 # 4. DISTRIBUIÇÃO POR SISTEMA
@@ -73,7 +73,7 @@ plt.figure(figsize=(7, 7))
 plt.pie(resumo, labels=resumo.index, autopct='%1.1f%%', startangle=140, colors=sns.color_palette('pastel'))
 plt.title("Representatividade por sistema")
 plt.tight_layout()
-plt.savefig('03_distribuicao_sistemas.png')
+plt.savefig('graphs_ade/03_distribuicao_sistemas.png')
 
 # ==========================================
 # 5. TIME X CATEGORIA (TOP 10)
@@ -87,7 +87,7 @@ plt.title("Perfil de Atendimento por Time (Top 10)")
 plt.xticks(rotation=45, ha='right')
 plt.legend(title="Sistemas", bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
-plt.savefig('04_time_vs_categoria.png')
+plt.savefig('graphs_ade/04_time_vs_categoria.png')
 
 # ==========================================
 # 6. PERFORMANCE (Z-SCORE BAYESIANO)
@@ -117,4 +117,4 @@ plt.axvline(-1, color='green', ls='--', alpha=0.5)
 plt.title("Ranking de Performance por Time (Z-Score Bayesiano)")
 plt.xlabel("Desvios Padrão (Z-Score)")
 plt.tight_layout()
-plt.savefig('05_zscore_performance.png')
+plt.savefig('graphs_ade/05_zscore_performance.png')
