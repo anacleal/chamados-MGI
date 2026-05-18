@@ -14,7 +14,8 @@ def normalize(text):
 def get_stopwords_formatadas():
     # lista de stopwords normalizadas
     stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
-    custom_stops = ["ola", "oi", "saudacoes", "senhores", "senhoras", "cordialmente", "att", "atenciosamente", "id", "nome", "siape", "sigepe", "siass", "sougov"]
+    custom_stops = ['ola', 'oi', 'saudacoes', 'senhores', 'senhoras', 'cordialmente', 'att', 'atenciosamente', 'id', 'nome',
+                    'siape', 'sigepe', 'siass', 'sougov', 'bom', 'boa', 'dia', 'tarde', 'noite', 'nao']
     stopwords_pt.update(custom_stops)
     return stopwords_pt
 
@@ -23,12 +24,17 @@ def load_nomes_formatados(file_path):
     with open(file_path, "r", encoding="utf-8") as f:
         nomes = {normalize(nome.strip()) for nome in f if nome.strip()}
     return nomes
-
 def preprocess_text(text, stopwords_pt, nomes):
     # limpa e tokeniza o texto, e limpa os nomes e numeros
     if pd.isna(text): return ""
 
     text = normalize(text)
+
+    # Remove expressões compostas antes da tokenização
+    expressoes_remover = ['bom dia', 'boa tarde', 'boa noite', 'sou gov',]
+    for expr in expressoes_remover:
+        text = text.replace(expr, ' ')
+
     # remove emails
     text = re.sub(r'\S+@\S+', ' ', text)
     # remove URLs
@@ -41,11 +47,14 @@ def preprocess_text(text, stopwords_pt, nomes):
 
     for token in tokens:
         if token == "nao":
-            resultado.append("nao")
+            #resultado.append("nao")
             continue
 
-        # remove stopwords
+        #remove stopwords
         if token in stopwords_pt or token in nomes or token.startswith("prezad") or token.startswith("servidor"):
+            continue
+
+        if token in nomes:
             continue
 
 
@@ -71,16 +80,12 @@ def process_original_file(input_path, output_path, names_path):
     # carrega a base
     df = pd.read_csv(input_path, encoding="utf-8", low_memory=False)
 
-    # coluna inutil
-    if 'Organização' in df.columns:
-        df = df.drop(columns=['Organização'])
-        print(" -> Coluna 'Organização' removida com sucesso.")
-
     nomes = load_nomes_formatados(names_path)
     stopwords_pt = get_stopwords_formatadas()
 
     labels_to_process = [
-        "titulo", "descricao do chamado"
+        "titulo", "descricao do chamado", "ultima acao de acompanhamento",
+        "titulo da ultima acao padrao", "chamados relacionados"
     ]
 
     cols_originais = df.columns
@@ -98,8 +103,8 @@ def process_original_file(input_path, output_path, names_path):
 
 
 if __name__ == "__main__":
-    INPUT_CSV = "../data/base_de_dados.csv"
-    OUTPUT_CSV = "../data/clean.csv"
+    INPUT_CSV = "../data/base_de_dados_a.csv"
+    OUTPUT_CSV = "../data/base_de_dados.csv"
     NAMES_FILE = "../data/nomes_formatados.txt"
 
-    preprocess_text(INPUT_CSV, OUTPUT_CSV, NAMES_FILE)
+    process_original_file(INPUT_CSV, OUTPUT_CSV, NAMES_FILE)
