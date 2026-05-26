@@ -6,22 +6,22 @@ import matplotlib.pyplot as plt
 import os
 import torch
 from bertopic import BERTopic as BERTopic_
+from sklearn.cluster import KMeans
 from umap import UMAP
 from hdbscan import HDBSCAN
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from sentence_transformers import SentenceTransformer
-from nltk.corpus import stopwords
 import nltk
 
-try:
-    nltk.data.find('corpora/stopwords')
-except LookupError:
-    nltk.download('stopwords', quiet=True)
+# Detecção global de GPU
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 class BERTopic(BERTopic_):
-    def __init__(self, **kwargs):
+    def __init__(self, device=DEVICE, **kwargs):
         super().__init__(**kwargs)
+        self.encoder = SentenceTransformer('all-mpnet-base-v2', device=device)
         
     def print_params(self):
         print("Parâmetros do modelo:")
@@ -52,17 +52,23 @@ class BERTopic(BERTopic_):
         with open(pathfile, "w", encoding="utf-8") as file:
             json.dump(result, file, ensure_ascii=False, indent=4)
 
+    def save_params(self, pathfile: str) -> None:
+        os.makedirs(os.path.dirname(pathfile), exist_ok=True)
+        params = {
+            "nr_topics": self.nr_topics,
+            "calculate_probabilities": self.calculate_probabilities,
+            "verbose": self.verbose,
+            "embedding_model": str(self.embedding_model) if hasattr(self, 'embedding_model') else "None",
+            "umap_model": str(self.umap_model) if hasattr(self, 'umap_model') else "None",
+            "hdbscan_model": str(self.hdbscan_model) if hasattr(self, 'hdbscan_model') else "None",
+            "vectorizer_model": str(self.vectorizer_model) if hasattr(self, 'vectorizer_model') else "None",
+            "representation_model": {k: str(v) for k, v in self.representation_model.items()} if isinstance(getattr(self, 'representation_model', None), dict) else str(getattr(self, 'representation_model', "None"))
+        }
+        with open(pathfile, "w", encoding="utf-8") as f:
+            json.dump(params, f, ensure_ascii=False, indent=4)
+
     def evaluate_model(self, docs: list) -> dict:
-        """métricas de qualidade do modelo"""
         metrics = {}
-
-        # 1. porcentagem de outliers (-1)
-        topic_info = self.get_topic_info()
-        total_docs = topic_info['Count'].sum()
-        outliers = topic_info[topic_info['Topic'] == -1]['Count'].values
-        outliers_count = outliers[0] if len(outliers) > 0 else 0
-        metrics['outlier_percentage'] = round((outliers_count / total_docs) * 100, 2)
-
 
         # 2. diversidade de topicos
         # mede a proporção de palavras únicas entre os top 10 termos de todos os tópicos
@@ -79,8 +85,8 @@ class BERTopic(BERTopic_):
         else:
             metrics['topic_diversity'] = 0
 
-        # 3. num de tópicos (excluindo outliers)
-        metrics['num_topics'] = len([t for t in topics if t != -1])
+        # 3. num de tópicos
+        metrics['num_topics'] = len([t for t in topics])
         return metrics
                     
     def dominant_topics(self, data: list, path: str, ids: list) -> None:
@@ -120,88 +126,63 @@ class BERTopic(BERTopic_):
         except Exception as e:
             print(f"Erro ao calcular tópicos dominantes: {e}")
 
-def run_bertopic(docs, ids, sistema_nome):
-    print(f"\n--- [{sistema_nome}] Iniciando Processamento ---")
+def run_bertopic(docs, ids, sistema_nome, nr_topics):
+    print(f"\n--- [{sistema_nome}] Iniciando Processamento ({nr_topics} tópicos) | Device: {DEVICE.upper()} ---")
 
     # caminhos para pastas e arquivos
-    graph_dir = f"bertopic_graphs/{sistema_nome}"
+    graph_dir = f"bertopic_graphs/{sistema_nome}/{nr_topics}_topicos"
     model_dir = "../models"
-    model_path = f"{model_dir}/model_{sistema_nome.lower()}"
-    results_dir = f"bertopic_resultados/{sistema_nome}"
+    model_path = f"{model_dir}/model_{sistema_nome.lower()}_{nr_topics}"
+    results_dir = f"bertopic_resultados/{sistema_nome}/{nr_topics}_topicos"
 
     os.makedirs(graph_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
     os.makedirs(results_dir, exist_ok=True)
 
     if os.path.exists(model_path):
-        print(f"[{sistema_nome}] Modelo encontrado! Carregando do disco...")
+        print(f"[{sistema_nome}] Modelo ({nr_topics} tópicos) encontrado! Carregando do disco...")
         topic_model = BERTopic.load(model_path)
     else:
-        print(f"[{sistema_nome}] Modelo não encontrado. Iniciando treinamento...")
+        print(f"[{sistema_nome}] Modelo ({nr_topics} tópicos) não encontrado. Iniciando treinamento...")
 
-        # 1. embeddings (Domain Adaptation - LoDA inspired) || artigo LoDA
-        # Using a strong multilingual model for Portuguese
-
-        # Configuração de GPU
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"[{sistema_nome}] Usando dispositivo: {device.upper()}")
-        
-        embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device=device)
+        # 1. embeddings
+        embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device=DEVICE)
 
         # 2. dimensionality reduction
         umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
 
         # 3. clustering
-        hdbscan_model = HDBSCAN(min_cluster_size=50, metric='euclidean', cluster_selection_method='eom',
-                                prediction_data=True)
+        hdbscan_model = KMeans(n_clusters=nr_topics, random_state=42)
 
-        # 4. vectorizer (Survey Analysis optimizations) || artigo survey
-        # Capturing N-grams and filtering rare words
-        pt_stopwords = list(set(stopwords.words('portuguese')))
-        vectorizer_model = CountVectorizer(ngram_range=(1, 3), stop_words=pt_stopwords, min_df=10)
-
-        # 5. Representation Models (Topic Reduction & Interpretation - Comparative Analysis inspired)
-        # KeyBERTInspired for better keyword extraction
-        # MMR to increase diversity and reduce redundancy in topic words
+        # 5. Representation Models
         representation_model = {
             "KeyBERTInspired": KeyBERTInspired(),
             "MMR": MaximalMarginalRelevance(diversity=0.3)
         }
 
         topic_model = BERTopic(
+            device=DEVICE,
             embedding_model=embedding_model,
             umap_model=umap_model, 
             hdbscan_model=hdbscan_model, 
-            vectorizer_model=vectorizer_model,
             representation_model=representation_model,
-            nr_topics="auto", # Automatic topic reduction
+            nr_topics=nr_topics, # Custom topic count
             calculate_probabilities=True, 
             verbose=True
         )
 
         topics, probs = topic_model.fit_transform(docs)
 
-        # 6. outlier reduction (Comparative Analysis inspired)
-        # reducing outliers by assigning them to the most similar topic based on probabilities
-        print(f"[{sistema_nome}] Reduzindo outliers...")
-        try:
-            new_topics = topic_model.reduce_outliers(docs, topics, strategy="c-tf-idf")
-            topic_model.update_topics(docs, topics=new_topics)
-        except Exception as e:
-            print(f"[{sistema_nome}] Erro ao reduzir outliers: {e}")
-
-        topic_model.save(model_path)
-        print(f"[{sistema_nome}] Modelo treinado e salvo em: {model_path}")
-
     #json save
     topic_model.save_txt(f"{results_dir}/topicos.txt")
     topic_model.save_json(f"{results_dir}/topicos.json")
+    topic_model.save_params(f"{results_dir}/parametros.json")
     
     metrics = topic_model.evaluate_model(docs)
     with open(f"{results_dir}/metricas.json", "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=4)
     
-    topic_model.dominant_topics(docs, sistema_nome, ids)
+    topic_model.dominant_topics(docs, f"{sistema_nome}/{nr_topics}_topicos", ids)
 
     try:
         topic_model.visualize_topics().write_html(f"{graph_dir}/intertopic_map.html")
@@ -229,10 +210,11 @@ if __name__ == "__main__":
             ids = df_clean[col_id].tolist()
 
             if len(docs) > 20:
-                run_bertopic(docs, ids, sis.upper())
+                for n_topics in [5, 10, 15]:
+                    run_bertopic(docs, ids, sis.upper(), nr_topics=n_topics)
             else:
                 print(f"Pulo: {sis.upper()} possui poucos documentos ({len(docs)}).")
         else:
             print(f"Arquivo não encontrado: {csv_path}")
 
-    print("\n✅ Processamento em lote finalizado!")
+    print("\nProcessamento em lote finalizado!")
