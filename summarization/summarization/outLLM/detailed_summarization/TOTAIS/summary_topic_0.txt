@@ -1,7 +1,0 @@
-**Padrão Dominante**: O padrão dominante nesse cluster é o problema de acesso e funcionamento dos sistemas de suporte ao governo brasileiro, incluindo problemas com certificados digitais, cadastros, perícias médicas, folhas de pagamento e outros. Os usuários relatam dificuldades em realizar tarefas básicas, como acessar perfis lider, cadastrar peritos, efetuar atualizações cadastrais e lancar transações financeiras. Além disso, há problemas com a integração entre sistemas, como SIAPENET e SERPRO, e também com a validação de cadastros. Os usuários relatam erros persistentes e não conseguem resolver os problemas por conta própria.
-
-**Impacto Operacional**: O problema afeta a capacidade dos servidores públicos de realizar suas funções, como agendar perícias médicas, efetuar pagamentos e gerenciar cadastros. Isso pode levar a atrasos na prestação de serviços e impactar negativamente a qualidade do atendimento ao público.
-
-**Frequência e Urgência**: O problema parece ser frequente e urgente, com muitos usuários relatando problemas semelhantes em diferentes órgãos e sistemas. A falta de solução para esses problemas pode levar a uma perda de confiança dos usuários nos sistemas e processos governamentais.
-
-**Observações adicionais**: É importante notar que os problemas relatados são variados e não se limitam a um único sistema ou órgão. Isso sugere que há problemas mais amplos com a infraestrutura e os processos de suporte ao governo brasileiro, que precisam ser abordados de forma sistemática para garantir a eficiência e a qualidade dos serviços públicos.

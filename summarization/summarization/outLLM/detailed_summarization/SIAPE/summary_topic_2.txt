@@ -1,8 +1,0 @@
-**Padrão Dominante**: O padrão dominante nesse cluster é relacionado a problemas de cadastro e inclusão de agências bancárias em sistemas de pagamento, especialmente no que diz respeito à Itaú. Os usuários estão solicitando a inclusão ou alteração de agências bancárias para fins de recebimento de salário, pensão ou outros tipos de pagamentos. O problema parece ser mais comum em relação à Itaú, mas também é mencionado em relação a outras instituições financeiras como Bradesco e Santander. Alguns casos apresentam problemas específicos, como agências ativas pertencentes a outro órgão após remoção de servidores ou agências que não foram encerradas corretamente no sistema.
-
-**Impacto Operacional**: A inclusão incorreta ou falta de agências bancárias nos sistemas de pagamento pode causar problemas para os usuários, como impossibilidade de recebimento de salário ou pensão, e também afeta as unidades administrativas que precisam realizar pagamentos. Além disso, a acumulação de filas de espera sem solução sistêmica disponível pode comprometer o funcionamento das unidades e causar transtornos aos usuários.
-
-Observações adicionais:
-- A frequência e urgência desses problemas parecem ser significativas, considerando o volume de tickets recebidos.
-- O tom dos tickets é geralmente educado e respeitoso, com os usuários solicitando ajuda para resolver os problemas.
-- Alguns casos apresentam nuances específicas, como a necessidade de alteração de dados bancários ou a inclusão de agências em sistemas de pagamento.

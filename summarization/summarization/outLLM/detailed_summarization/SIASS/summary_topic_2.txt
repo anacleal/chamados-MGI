@@ -1,3 +1,0 @@
-**Padrão Dominante**: O padrão dominante nesse cluster é o problema de "atestados pendentes" em diferentes órgãos e unidades, como SIASS, FUNASA, INSS, SIAPECAD, entre outros. Os usuários relatam que possuem atestados pendentes da mesma espécie, com data de afastamento anterior, e estão aguardando a situação ser resolvida. Alguns casos mencionam atraso no processo e dificuldade em localizar os atestados pendentes no sistema web SIAPENET.
-
-**Impacto Operacional**: A falta de atualização dos atestados pendentes afeta negativamente o trabalho das unidades, pois os servidores ficam sem atendimento pericial e as filas de espera não são resolvidas. Além disso, a situação também gera atrasos nos processos e dificuldade em gerenciar as pendências.
