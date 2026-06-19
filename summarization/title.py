@@ -36,7 +36,7 @@ K_POR_SISTEMA = {
     "TOTAIS": 10,
 }
 
-RESUMOS_DIR = "./summarization/outLLM/detailed_summarization"
+RESUMOS_DIR = "outLLM/detailed_summarization"
 
 
 # ============================================================

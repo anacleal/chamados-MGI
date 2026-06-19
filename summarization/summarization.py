@@ -1,18 +1,3 @@
-"""
-Sumarização Detalhada de Chamados por Tópico — Llama 3.1 (Ollama local)
-========================================================================
-Estratégia de seleção de documentos por tópico:
-  - 30 documentos com maior probabilidade de pertencimento ao tópico (núcleo)
-  - 15 documentos aleatórios dentre os restantes do mesmo tópico (periferia)
-
-Formato de saída por tópico:
-  - Padrão Dominante: o que esse cluster está dizendo (livre para detalhar)
-  - Impacto Operacional: o que isso causa na prática
-
-Entrada e saída em português brasileiro.
-Os prompts são escritos em inglês para melhor alinhamento com o modelo.
-"""
-
 import os
 import json
 import random
@@ -69,15 +54,6 @@ def load_keywords(sistema: str, topic: int) -> list[str]:
 
 
 def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
-    """
-    Retorna (nucleo, periferia):
-      - nucleo:    os N_NUCLEO chamados com maior probabilidade no tópico
-      - periferia: N_PERIFERIA chamados aleatórios dentre os restantes do mesmo tópico
-
-    Usa Topicos_Dominantes.csv (com colunas de probabilidade) para o ranking,
-    e Resumo_Topicos_Dominantes.csv apenas como fallback quando as probabilidades
-    não estiverem disponíveis.
-    """
     df_path  = f'../data/chamados_{sistema.lower()}.csv'
     td_path  = f'../topic_modeling/bertopic_resultados/{sistema}/Topicos_Dominantes.csv'
     rdt_path = f'../topic_modeling/bertopic_resultados/{sistema}/Resumo_Topicos_Dominantes.csv'
@@ -168,9 +144,9 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
 # PROMPT DE SUMARIZAÇÃO
 # ============================================================
 _EXEMPLO = """
-**Padrão Dominante**: Bloqueio no agendamento de perícias — o sistema impede a abertura de nova perícia enquanto existe uma perícia ativa, sem oferecer opção de cancelamento. O problema afeta unidades SIASS de diferentes órgãos e se manifesta tanto em perícias agendadas incorretamente quanto em perícias antigas que deveriam ter sido encerradas mas permaneceram abertas no sistema. Em alguns casos, a perícia ativa pertence a outro órgão após remoção do servidor, impossibilitando qualquer ação pela unidade atual.
+**Padrão Dominante**: Falha na integração entre SIAPE e SIASS impede que afastamentos registrados em um sistema sejam refletidos automaticamente no outro. O problema se manifesta tanto em afastamentos recentes quanto em registros antigos que já deveriam ter sido sincronizados. Quando o servidor muda de lotação, o histórico de afastamentos do órgão anterior fica inacessível para a nova unidade, exigindo intervenção manual da equipe de suporte para cada caso.
 
-**Impacto Operacional**: Servidores ficam sem atendimento pericial, perícias anteriores incorretas não podem ser corrigidas e unidades acumulam filas de espera sem solução sistêmica disponível.
+**Impacto Operacional**: As unidades precisam lançar afastamentos manualmente em duplicidade, gerando inconsistências nos registros de licença médica e atrasando o processamento da folha de pagamento.
 """.strip()
 
 SYSTEM_PROMPT = """\
@@ -191,19 +167,24 @@ Replace ALL personal data (names, CPFs, registration numbers, e-mails, phone num
 [DADO REMOVIDO].
 
 [TASK]
-Read all tickets and produce a concise structured report answering three questions:
+Read all tickets and produce a structured report with exactly two fields:
 1. What is the dominant pattern in this cluster? (the core issue or behavior these tickets share)
 2. What is the operational impact? (what this causes in practice for users and operators)
-3. How frequent and urgent does this appear to be? (based on volume, tone, and diversity of tickets)
 
 [OUTPUT FORMAT — FOLLOW EXACTLY]
-Two fields, each starting on its own line, written in Brazilian Portuguese (pt-BR).
-No bullet points, no sub-items, no additional sections, no introductions or conclusions.
+- Exactly two fields, no more, no less.
+- Each field starts with its bold label on its own line.
+- Written in Brazilian Portuguese (pt-BR).
+- No bullet points, no numbered lists, no sub-items.
+- No extra sections, notes, conclusions, or meta-commentary of any kind.
+- Do not mention the number of tickets or refer to NÚCLEO/PERIFERIA in the output.
+- Stop writing immediately after the Impacto Operacional field.
 
-**Padrão Dominante**: [Describe the core pattern shared by the tickets. Cover the main issue, \
-its variations, and any relevant context observed across the tickets. Length should match \
-the complexity of what was found — be concise when the pattern is simple, more detailed \
-when there are meaningful nuances worth capturing.]
+**Padrão Dominante**: [Describe the core pattern shared by the tickets. Cover the main issue \
+and its relevant variations observed across the tickets. Length should match the complexity \
+of what was found — be concise when the pattern is simple, more detailed when there are \
+meaningful nuances worth capturing. Do not include bullet points or lists. \
+Do not describe consequences here — save those for Impacto Operacional.]
 
 **Impacto Operacional**: [One or two sentences on the practical consequences for users and operators.]
 
@@ -268,18 +249,18 @@ def get_summary(nucleo: list[str], periferia: list[str], keywords: list[str], si
     return resposta
 
 
-# ============================================================
-# PERSISTÊNCIA
-# ============================================================
+
+
 def save_summary(text: str, sistema: str, topic: int) -> None:
-    dir_path = f'./summarization/outLLM/detailed_summarization/{sistema}'
+    dir_path = f'.//outLLM/detailed_summarization/{sistema}'
     os.makedirs(dir_path, exist_ok=True)
     with open(f'{dir_path}/summary_topic_{topic}.txt', 'w', encoding='utf-8') as f:
         f.write(text)
 
 
 def load_saved_summary(sistema: str, topic: int) -> str | None:
-    filepath = f'./summarization/outLLM/detailed_summarization/{sistema}/summary_topic_{topic}.txt'
+    filepath = (f'./'
+                f'/outLLM/detailed_summarization/{sistema}/summary_topic_{topic}.txt')
     if not os.path.exists(filepath):
         return None
     with open(filepath, encoding='utf-8') as f:

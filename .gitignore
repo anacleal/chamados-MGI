@@ -1,9 +1,9 @@
 /.venv
 /data
 /lista_de_nomes/ibge-data
+/summarization/outLLM
 /topic_modeling/bertopic_graphs
-/topic_modeling/models
 /topic_modeling/bertopic_resultados
+/topic_modeling/models
 /data/.idea
 /.idea/
-/summarization/outLLM

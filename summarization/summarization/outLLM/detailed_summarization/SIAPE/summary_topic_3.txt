@@ -1,5 +1,0 @@
-**Padrão Dominante**: O padrão dominante é a necessidade de cadastramento e inclusão de cursos, formação e qualificação profissional em diferentes áreas, como ensino superior, pós-graduação, mestrado e doutorado. Os usuários solicitam a inclusão desses dados no sistema para fins de reconhecimento de titulação, formação e qualificação profissional, bem como para gerar efeito financeiro. Alguns casos também mencionam problemas com a classificação de cargos e vagas, incluindo alterações em classes padrão e inclusão de concursados.
-
-**Impacto Operacional**: A falta de cadastramento e inclusão desses dados pode causar problemas na reconhecimento de titulação e formação profissional dos funcionários, além de dificultar a gestão de cargos e vagas. Isso pode levar a problemas financeiros e administrativos para os órgãos responsáveis.
-
-**Frequência e Urgência**: A frequência desses chamados é alta, com 30 casos no núcleo e 15 na periferia do tópico. A urgência também é alta, pois muitos dos usuários solicitam soluções urgentes para problemas que afetam a gestão de cargos e vagas, além da reconhecimento de titulação e formação profissional.

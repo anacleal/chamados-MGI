@@ -5,7 +5,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-RESUMOS_DIR = "./summarization/outLLM/detailed_summarization"
+RESUMOS_DIR = "outLLM/detailed_summarization"
 
 K_POR_SISTEMA = {
     "SIASS":  6,

@@ -1,3 +1,0 @@
-**Padrão Dominante**: O padrão dominante é a solicitação de liberação de matrícula, com repetição constante da frase "solicitamos liberacao matricula acima digitacao dados abaixo face [algum tipo de atendimento/diligência] seq". Isso sugere que há um problema recorrente no sistema que impede a liberação de matrículas, e os usuários estão tentando resolver isso. Além disso, alguns chamados mencionam a criação ou transferência de vagas, o que pode estar relacionado ao problema principal.
-
-**Impacto Operacional**: A falta de liberação de matrícula está causando problemas para os servidores e unidades, pois eles não podem atender às necessidades dos usuários. Isso também está acumulando filas de espera sem solução sistêmica disponível.

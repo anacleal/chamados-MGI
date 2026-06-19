@@ -1,3 +1,0 @@
-**Padrão Dominante**: O padrão dominante nesse cluster de tickets é relacionado a problemas com o cálculo e desconto de pensões alimentícias no sistema. Os usuários relatam dificuldades em incluir, alterar ou excluir informações sobre pensões alimentícias, bem como problemas com o desconto desses valores nas folhas de pagamento. Alguns casos também mencionam inconsistências nos cálculos e descontos, levando a erros e devoluções de valores. Os usuários solicitam orientação e correção para resolver essas questões.
-
-**Impacto Operacional**: O problema afeta a gestão das pensões alimentícias no sistema, causando atrasos e erros nos pagamentos, além de gerar confusão e descontentamento entre os usuários.
