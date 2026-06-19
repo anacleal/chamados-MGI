@@ -1,0 +1,5 @@
+**Padrão Dominante**: O padrão dominante nesse cluster de tickets é relacionado a problemas com eventos e rejeições no sistema gerenciador integrador do esocial. Os usuários estão relatando que eventos importantes, como remuneração e admissões, estão sendo rejeitados sem motivo claro ou sem opção de cancelamento. Isso está causando problemas operacionais, como filas de espera sem solução sistêmica disponível e servidores sem atendimento pericial. Além disso, há também problemas com cadastros temporários e erros de validação XML.
+
+**Impacto Operacional**: A rejeição de eventos importantes está causando problemas operacionais significativos, como filas de espera sem solução sistêmica disponível e servidores sem atendimento pericial. Além disso, a falta de opção de cancelamento para os eventos rejeitados está dificultando a resolução dos problemas.
+
+Frequência e Urgência: A frequência desses problemas é alta, com muitos usuários relatando problemas semelhantes. A urgência também é alta, pois esses problemas estão afetando a operação normal do sistema e causando problemas para os usuários.

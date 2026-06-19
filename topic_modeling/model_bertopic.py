@@ -1,220 +1,301 @@
+"""
+BERTopic - Modelagem de Tópicos para Chamados de Suporte
+=========================================================
+Reprodutibilidade garantida via seeds fixas em todos os componentes estocásticos.
+O número de tópicos por sistema foi determinado pelo método do cotovelo (inércia do KMeans).
+Os hiperparâmetros do UMAP são selecionados via Grid Search usando o Índice de Silhueta.
+
+Seeds fixas aplicadas em:
+  - numpy       (SEED)
+  - Python random (SEED)
+  - PyTorch     (SEED)
+  - UMAP        (random_state=SEED)
+  - KMeans      (random_state=SEED)
+"""
+
+import random
+import os
+import json
+import itertools
+
 import numpy as np
 import pandas as pd
-import seaborn as sns
-import json
-import matplotlib.pyplot as plt
-import os
 import torch
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from bertopic import BERTopic as BERTopic_
 from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
 from umap import UMAP
-from hdbscan import HDBSCAN
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from sentence_transformers import SentenceTransformer
-import nltk
 
-# Detecção global de GPU
+# ---------------------------------------------------------------------------
+# Reprodutibilidade global
+# ---------------------------------------------------------------------------
+SEED = 42
+
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+
+# ---------------------------------------------------------------------------
+# Configurações globais
+# ---------------------------------------------------------------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+# Número de tópicos determinado pelo método do cotovelo para cada sistema
+K_POR_SISTEMA = {
+    "SIASS":  6,
+    "SOUGOV": 5,
+    "SIGEPE": 5,
+    "SIAPE":  8,
+    "TOTAIS": 10,
+}
+
+# Grade de hiperparâmetros do UMAP avaliada via Índice de Silhueta
+# n_neighbors: controla o balanço entre estrutura local e global
+# n_components: dimensionalidade do espaço reduzido antes do KMeans
+# metric: função de distância usada pelo UMAP
+UMAP_PARAM_GRID = {
+    "n_neighbors":  [15, 30, 50],
+    "n_components": [5, 10, 15],
+    "metric":       ["cosine", "euclidean"],
+}
+
+COL_TEXTO = "Descrição do chamado"
+COL_ID    = "Id"
+
+
+# ---------------------------------------------------------------------------
+# Classe BERTopic estendida
+# ---------------------------------------------------------------------------
 class BERTopic(BERTopic_):
-    def __init__(self, device=DEVICE, **kwargs):
+    """BERTopic com métodos auxiliares de persistência e análise de tópicos dominantes."""
+
+    def __init__(self, device: str = DEVICE, **kwargs):
+        self.device = device
         super().__init__(**kwargs)
-        self.encoder = SentenceTransformer('all-mpnet-base-v2', device=device)
-        
-    def print_params(self):
-        print("Parâmetros do modelo:")
-        for key, value in self.__dict__.items():
-            print(f"{key}: {value}")
-            
+
     def save_txt(self, pathfile: str) -> None:
         os.makedirs(os.path.dirname(pathfile), exist_ok=True)
-        with open(pathfile, 'w', encoding='utf-8') as f:
-            topic_info = self.get_topic_info()
-            for i in range(len(topic_info)):
-                t = topic_info['Topic'][i]
-                f.write(f'\ntopico {t}:\n')
-                words = topic_info['Representation'][i]
+        topic_info = self.get_topic_info()
+        with open(pathfile, "w", encoding="utf-8") as f:
+            for _, row in topic_info.iterrows():
+                f.write(f"\ntopico {row['Topic']}:\n")
+                words = row["Representation"]
                 if isinstance(words, list):
-                    for word in words:
-                        f.write(f'{word} ')
-                f.write('\n')
-                    
+                    f.write(" ".join(words))
+                f.write("\n")
+
     def save_json(self, pathfile: str) -> None:
         os.makedirs(os.path.dirname(pathfile), exist_ok=True)
-        topics = self.get_topics() # retorna um dicionario em py (key - id do topico, value - lista de palavras)
-        result = {}
-        for topic_id, words in topics.items():
-            # BERTopic retorna as palavras como tuplas (palavra, score)
-            result[topic_id] = [[word, float(value)] for word, value in words if word != ""]
+        result = {
+            topic_id: [[word, float(score)] for word, score in words if word]
+            for topic_id, words in self.get_topics().items()
+        }
+        with open(pathfile, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=4)
 
-        with open(pathfile, "w", encoding="utf-8") as file:
-            json.dump(result, file, ensure_ascii=False, indent=4)
-
-    def save_params(self, pathfile: str) -> None:
+    def save_params(self, pathfile: str, umap_params: dict = None) -> None:
         os.makedirs(os.path.dirname(pathfile), exist_ok=True)
         params = {
+            "seed": SEED,
             "nr_topics": self.nr_topics,
             "calculate_probabilities": self.calculate_probabilities,
             "verbose": self.verbose,
-            "embedding_model": str(self.embedding_model) if hasattr(self, 'embedding_model') else "None",
-            "umap_model": str(self.umap_model) if hasattr(self, 'umap_model') else "None",
-            "hdbscan_model": str(self.hdbscan_model) if hasattr(self, 'hdbscan_model') else "None",
-            "vectorizer_model": str(self.vectorizer_model) if hasattr(self, 'vectorizer_model') else "None",
-            "representation_model": {k: str(v) for k, v in self.representation_model.items()} if isinstance(getattr(self, 'representation_model', None), dict) else str(getattr(self, 'representation_model', "None"))
+            "umap_params_selecionados": umap_params or {},
+            "embedding_model":     str(getattr(self, "embedding_model",  "None")),
+            "umap_model":          str(getattr(self, "umap_model",        "None")),
+            "kmeans_model":        str(getattr(self, "hdbscan_model",     "None")),
+            "vectorizer_model":    str(getattr(self, "vectorizer_model",  "None")),
+            "representation_model": (
+                {k: str(v) for k, v in self.representation_model.items()}
+                if isinstance(getattr(self, "representation_model", None), dict)
+                else str(getattr(self, "representation_model", "None"))
+            ),
         }
         with open(pathfile, "w", encoding="utf-8") as f:
             json.dump(params, f, ensure_ascii=False, indent=4)
 
-    def evaluate_model(self, docs: list) -> dict:
-        metrics = {}
-
-        # 2. diversidade de topicos
-        # mede a proporção de palavras únicas entre os top 10 termos de todos os tópicos
-        all_words = []
-        topics = self.get_topics()
-        for t in topics:
-            if t != -1: #ignora outliers
-                words = [w[0] for w in topics[t][:10]]
-                all_words.extend(words)
-        
-        if len(all_words) > 0:
-            unique_words = set(all_words)
-            metrics['topic_diversity'] = round(len(unique_words) / len(all_words), 4)
-        else:
-            metrics['topic_diversity'] = 0
-
-        # 3. num de tópicos
-        metrics['num_topics'] = len([t for t in topics])
-        return metrics
-                    
-    def dominant_topics(self, data: list, path: str, ids: list) -> None:
-        output_dir = f'./bertopic_resultados/{path}'
+    def dominant_topics(self, docs: list, output_dir: str, ids: list) -> None:
         os.makedirs(output_dir, exist_ok=True)
-        
         topic_info = self.get_topic_info()
-        topicnames = ['Topico ' + str(i) for i in topic_info["Topic"].values.tolist()]
+        topicnames = ["Topico " + str(t) for t in topic_info["Topic"].tolist()]
         papernames = [str(i) for i in ids]
-        
-        try:
-            topic_dist, _ = self.approximate_distribution(data)
-            #porcentagem de semelhança de cada chamado com cada um dos topicos criados
-            if "Topico -1" in topicnames:
-                temp_array = 1 - topic_dist.sum(axis=1)
-                topic_dist = np.insert(topic_dist, 0, temp_array, axis=1)
-                #se somar as porcentagens e dar por ex. 85%, significa que os 15% restantes vao para o -1 (outlier)
 
-            # cria o dataframe
-            df_document_topic = pd.DataFrame(np.round(topic_dist, 4), columns=topicnames)
-            df_document_topic['id'] = papernames
-            df_document_topic['dominant_topic'] = self.topics_
+        try:
+            topic_dist, _ = self.approximate_distribution(docs)
+
+            df_dt = pd.DataFrame(np.round(topic_dist, 4), columns=topicnames)
+            df_dt["id"]             = papernames
+            df_dt["dominant_topic"] = self.topics_
 
             plt.figure(figsize=(10, 6))
-            sns.countplot(x=df_document_topic.dominant_topic)
-            plt.title(f'Distribuição de Tópicos Dominantes - {path}')
-            plt.savefig(f'{output_dir}/Topicos_Dominantes.png')
+            sns.countplot(x=df_dt["dominant_topic"])
+            plt.title("Distribuição de Tópicos Dominantes")
+            plt.savefig(os.path.join(output_dir, "Topicos_Dominantes.png"))
             plt.close()
 
-            df_document_topic.to_csv(f'{output_dir}/Topicos_Dominantes.csv', sep="|", index=False)
-            
-            resumo = pd.DataFrame()
-            resumo['id'] = papernames
-            resumo['dominant_topic'] = df_document_topic['dominant_topic'].values
-            resumo.to_csv(f'{output_dir}/Resumo_Topicos_Dominantes.csv', index=False)
-            print(f"Resultados de tópicos dominantes salvos em {output_dir}")
+            df_dt.to_csv(os.path.join(output_dir, "Topicos_Dominantes.csv"), sep="|", index=False)
+
+            pd.DataFrame({"id": papernames, "dominant_topic": df_dt["dominant_topic"].values}).to_csv(
+                os.path.join(output_dir, "Resumo_Topicos_Dominantes.csv"), index=False
+            )
+            print(f"  Tópicos dominantes salvos em {output_dir}")
         except Exception as e:
-            print(f"Erro ao calcular tópicos dominantes: {e}")
+            print(f"  Erro ao calcular tópicos dominantes: {e}")
 
-def run_bertopic(docs, ids, sistema_nome, nr_topics):
-    print(f"\n--- [{sistema_nome}] Iniciando Processamento ({nr_topics} tópicos) | Device: {DEVICE.upper()} ---")
 
-    # caminhos para pastas e arquivos
-    graph_dir = f"bertopic_graphs/{sistema_nome}/{nr_topics}_topicos"
-    model_dir = "../models"
-    model_path = f"{model_dir}/model_{sistema_nome.lower()}_{nr_topics}"
-    results_dir = f"bertopic_resultados/{sistema_nome}/{nr_topics}_topicos"
+# ---------------------------------------------------------------------------
+# Pipeline principal
+# ---------------------------------------------------------------------------
+def run_bertopic(docs: list, ids: list, sistema_nome: str, nr_topics: int) -> BERTopic:
+    print(f"\n--- [{sistema_nome}] {nr_topics} tópicos | device: {DEVICE.upper()} ---")
 
-    os.makedirs(graph_dir, exist_ok=True)
-    os.makedirs(model_dir, exist_ok=True)
-    os.makedirs(results_dir, exist_ok=True)
+    model_dir   = f"models/{sistema_nome}"
+    model_path  = f"{model_dir}/modelo"
+    results_dir = f"bertopic_resultados/{sistema_nome}"
+    graph_dir   = f"bertopic_graphs/{sistema_nome}"
 
-    if os.path.exists(model_path):
-        print(f"[{sistema_nome}] Modelo ({nr_topics} tópicos) encontrado! Carregando do disco...")
+    for d in (model_dir, results_dir, graph_dir):
+        os.makedirs(d, exist_ok=True)
+
+    # Carrega modelo existente ou treina do zero
+    if os.path.exists(model_path) and os.path.exists(f"{model_path}/config.json"):
+        print(f"  Modelo encontrado em {model_path}. Carregando...")
         topic_model = BERTopic.load(model_path)
+        melhores_params = None  # params já foram salvos na execução original
+
     else:
-        print(f"[{sistema_nome}] Modelo ({nr_topics} tópicos) não encontrado. Iniciando treinamento...")
+        # Embeddings calculados uma única vez e reutilizados em todo o grid
+        print(f"  Pré-calculando embeddings com SentenceTransformer no {DEVICE.upper()}...")
+        embedding_model = SentenceTransformer(
+            "paraphrase-multilingual-MiniLM-L12-v2", device=DEVICE
+        )
+        embeddings = embedding_model.encode(docs, show_progress_bar=True)
 
-        # 1. embeddings
-        embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device=DEVICE)
+        # --- Grid Search via Índice de Silhueta ---
+        keys, values  = zip(*UMAP_PARAM_GRID.items())
+        combinacoes   = [dict(zip(keys, v)) for v in itertools.product(*values)]
+        n_combinacoes = len(combinacoes)
 
-        # 2. dimensionality reduction
-        umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
+        print(f"  Iniciando Grid Search ({n_combinacoes} combinações)...")
 
-        # 3. clustering
-        hdbscan_model = KMeans(n_clusters=nr_topics, random_state=42)
+        melhor_silhueta = -1.0
+        melhores_params = None
+        resultados_grid = []
 
-        # 5. Representation Models
+        for idx, config in enumerate(combinacoes, start=1):
+            umap_model   = UMAP(**config, min_dist=0.0, random_state=SEED)
+            kmeans_model = KMeans(n_clusters=nr_topics, random_state=SEED, n_init=10)
+
+            # Modelo leve para avaliação: sem representation_model para ganhar velocidade
+            test_model = BERTopic(
+                device=DEVICE,
+                embedding_model=embedding_model,
+                umap_model=umap_model,
+                hdbscan_model=kmeans_model,
+                nr_topics=nr_topics,
+                verbose=False,
+            )
+            test_model.fit_transform(docs, embeddings)
+
+            # Silhueta calculada no espaço UMAP reduzido
+            reduced_emb = test_model.umap_model.transform(embeddings)
+            labels      = np.array(test_model.topics_)
+            silhueta    = round(float(silhouette_score(reduced_emb, labels)), 4)
+
+            resultados_grid.append({**config, "silhouette_score": silhueta})
+            print(f"    [{idx}/{n_combinacoes}] {config} -> Silhueta: {silhueta}")
+
+            if silhueta > melhor_silhueta:
+                melhor_silhueta = silhueta
+                melhores_params = config
+
+        print(f"  > Melhor configuração: {melhores_params} | Silhueta: {melhor_silhueta}")
+
+        # Salva tabela completa do grid para o artigo
+        pd.DataFrame(resultados_grid).to_csv(
+            f"{results_dir}/grid_search_resultados.csv", index=False
+        )
+
+        # --- Treinamento definitivo com os melhores parâmetros ---
+        print("  Treinando modelo definitivo...")
+        umap_final   = UMAP(**melhores_params, min_dist=0.0, random_state=SEED)
+        kmeans_final = KMeans(n_clusters=nr_topics, random_state=SEED, n_init=20)
+
         representation_model = {
             "KeyBERTInspired": KeyBERTInspired(),
-            "MMR": MaximalMarginalRelevance(diversity=0.3)
+            "MMR": MaximalMarginalRelevance(diversity=0.3),
         }
 
         topic_model = BERTopic(
             device=DEVICE,
             embedding_model=embedding_model,
-            umap_model=umap_model, 
-            hdbscan_model=hdbscan_model, 
+            umap_model=umap_final,
+            hdbscan_model=kmeans_final,
             representation_model=representation_model,
-            nr_topics=nr_topics, # Custom topic count
-            calculate_probabilities=True, 
-            verbose=True
+            nr_topics=nr_topics,
+            calculate_probabilities=True,
+            verbose=True,
         )
+        topic_model.fit_transform(docs, embeddings)
 
-        topics, probs = topic_model.fit_transform(docs)
+        # Silhueta do modelo definitivo
+        final_reduced   = topic_model.umap_model.transform(embeddings)
+        final_labels    = np.array(topic_model.topics_)
+        silhueta_final  = round(float(silhouette_score(final_reduced, final_labels)), 4)
 
-    #json save
-    topic_model.save_txt(f"{results_dir}/topicos.txt")
-    topic_model.save_json(f"{results_dir}/topicos.json")
-    topic_model.save_params(f"{results_dir}/parametros.json")
-    
-    metrics = topic_model.evaluate_model(docs)
-    with open(f"{results_dir}/metricas.json", "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=4)
-    
-    topic_model.dominant_topics(docs, f"{sistema_nome}/{nr_topics}_topicos", ids)
+        with open(f"{results_dir}/metricas_validacao.json", "w", encoding="utf-8") as f:
+            json.dump({
+                "silhouette_score":        silhueta_final,
+                "melhores_parametros_umap": melhores_params,
+            }, f, ensure_ascii=False, indent=4)
 
+        print(f"  Salvando modelo em {model_path}...")
+        topic_model.save(model_path, serialization="safetensors", save_ctfidf=True)
+
+    # Persistência de resultados
+    topic_model.save_txt(   f"{results_dir}/topicos.txt")
+    topic_model.save_json(  f"{results_dir}/topicos.json")
+    topic_model.save_params(f"{results_dir}/parametros.json", umap_params=melhores_params)
+    topic_model.dominant_topics(docs, results_dir, ids)
+
+    # Visualizações interativas
     try:
-        topic_model.visualize_topics().write_html(f"{graph_dir}/intertopic_map.html")
-        topic_model.visualize_barchart(top_n_topics=10).write_html(f"{graph_dir}/bar_graphs.html")
-        topic_model.visualize_hierarchy().write_html(f"{graph_dir}/hierarchy.html")
-        topic_model.get_topic_info().to_csv(f"{graph_dir}/topic_info.csv", index=False)
+        topic_model.visualize_topics()                          .write_html(f"{graph_dir}/intertopic_map.html")
+        topic_model.visualize_barchart(top_n_topics=nr_topics)  .write_html(f"{graph_dir}/bar_graphs.html")
+        topic_model.visualize_hierarchy()                       .write_html(f"{graph_dir}/hierarchy.html")
+        topic_model.get_topic_info()                            .to_csv(    f"{graph_dir}/topic_info.csv", index=False)
     except Exception as e:
-        print(f"[{sistema_nome}] Erro ao gerar gráficos: {e}")
+        print(f"  Erro ao gerar visualizações: {e}")
 
     return topic_model
 
+
+# ---------------------------------------------------------------------------
+# Entrada
+# ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    sistemas = ["siape", "siass", "sigepe", "sougov", "totais"]
-    col_texto = "Descrição do chamado"
-    col_id = "Id"
+    for sistema, k in K_POR_SISTEMA.items():
+        csv_path = f"../data/chamados_{sistema.lower()}.csv"
 
-    for sis in sistemas:
-        csv_path = f"../data/chamados_{sis}.csv"
-
-        if os.path.exists(csv_path):
-            df = pd.read_csv(csv_path, low_memory=False)
-            df_clean = df.dropna(subset=[col_texto])
-
-            docs = df_clean[col_texto].astype(str).tolist()
-            ids = df_clean[col_id].tolist()
-
-            if len(docs) > 20:
-                for n_topics in [5, 10, 15]:
-                    run_bertopic(docs, ids, sis.upper(), nr_topics=n_topics)
-            else:
-                print(f"Pulo: {sis.upper()} possui poucos documentos ({len(docs)}).")
-        else:
+        if not os.path.exists(csv_path):
             print(f"Arquivo não encontrado: {csv_path}")
+            continue
 
-    print("\nProcessamento em lote finalizado!")
+        df   = pd.read_csv(csv_path, low_memory=False).dropna(subset=[COL_TEXTO])
+        docs = df[COL_TEXTO].astype(str).tolist()
+        ids  = df[COL_ID].tolist()
+
+        if len(docs) < 100:
+            print(f"[{sistema}] Ignorado: apenas {len(docs)} documentos disponíveis.")
+            continue
+
+        run_bertopic(docs, ids, sistema, nr_topics=k)
+
+    print("\nProcessamento finalizado!")

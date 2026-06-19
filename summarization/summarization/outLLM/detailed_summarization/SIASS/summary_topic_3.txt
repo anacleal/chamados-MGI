@@ -1,0 +1,11 @@
+**Padrão Dominante**: O padrão dominante em relação a este tópico é o problema de acesso e agendamento de perícias médicas no sistema, incluindo questões relacionadas à realização de perícias remotas (telessaúde), registros de afastamentos e atestados. Os usuários relatam dificuldades em agendar perícias, acessar prontuários e realizar procedimentos de telessaúde, além de problemas com a homologação de atestados e registros de afastamento.
+
+**Impacto Operacional**: O sistema de agendamento de perícias médicas está apresentando problemas significativos, impedindo que os usuários realizem procedimentos de saúde necessários. Além disso, a falta de acesso a prontuários e registros de afastamentos está causando dificuldades para os profissionais de saúde em realizar suas funções.
+
+**Frequência e Urgência**: A frequência desses problemas é alta, com muitos usuários relatando dificuldades em agendar perícias e acessar prontuários. Além disso, a urgência desses problemas também é alta, pois os usuários precisam realizar procedimentos de saúde urgentes para atender às necessidades dos pacientes.
+
+**Observações adicionais**: É importante notar que muitos dos problemas relatados estão relacionados à falta de treinamento e orientação adequada para os usuários do sistema. Além disso, a documentação e o registro de procedimentos também são áreas que precisam ser melhoradas para evitar problemas futuros.
+
+**Sugestões**: Sugiro que sejam realizadas sessões de treinamento e orientação para os usuários do sistema, incluindo as equipes de saúde e os profissionais responsáveis por realizar perícias. Além disso, é importante revisar a documentação e o registro de procedimentos para garantir que todos os passos sejam seguidos corretamente.
+
+**Conclusão**: Em resumo, o padrão dominante em relação a este tópico é o problema de acesso e agendamento de perícias médicas no sistema, incluindo questões relacionadas à realização de perícias remotas (telessaúde), registros de afastamentos e atestados. É importante abordar esses problemas para garantir que os usuários possam realizar procedimentos de saúde necessários sem dificuldades.

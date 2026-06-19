@@ -1,0 +1,12 @@
+**Padrão Dominante**: O padrão dominante nesse cluster é relacionado a problemas e solicitações de alterações nos sistemas de gestão de pessoal, benefícios e cargos dos órgãos públicos brasileiros. As principais questões incluem:
+
+* Problemas com a inclusão de feriados municipais e estaduais no sistema;
+* Solicitações de vinculação de matrículas e CPFs para funcionários;
+* Alterações em cargos, funções e benefícios;
+* Problemas com a progressão funcional e promoção de servidores;
+* Solicitações de exclusão de cargos ou alteração de rubricas;
+* Problemas com a inclusão de descontos e impostos na folha de pagamento.
+
+Esses problemas afetam unidades SIASS de diferentes órgãos e se manifestam tanto em perícias agendadas incorretamente quanto em perícias antigas que deveriam ter sido encerradas mas permaneceram abertas no sistema. Em alguns casos, a perícia ativa pertence a outro órgão após remoção do servidor, impossibilitando qualquer ação pela unidade atual.
+
+**Impacto Operacional**: Servidores ficam sem atendimento pericial, perícias anteriores incorretas não podem ser corrigidas e unidades acumulam filas de espera sem solução sistêmica disponível.
