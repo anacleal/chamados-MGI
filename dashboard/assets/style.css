@@ -1,0 +1,355 @@
+/* ============================================================
+   Dashboard de Análise de Chamados MGI — Estilo institucional
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg:            #F7F8FA;
+    --panel:         #FFFFFF;
+    --ink:           #1C2530;
+    --ink-soft:      #5B6776;
+    --line:          #E2E5EA;
+    --accent:        #2B6CB0;
+    --accent-soft:   #E8F0FA;
+    --alert:         #C2410C;
+    --alert-soft:    #FBEAE1;
+
+    --sis-siass:  #2B6CB0;
+    --sis-siape:  #2F7D6B;
+    --sis-sigepe: #8B5CF6;
+    --sis-sougov: #B8860B;
+    --sis-totais: #475569;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    margin: 0;
+}
+
+.mono {
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ---------- Layout geral ---------- */
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 280px;
+    min-width: 280px;
+    background-color: var(--panel);
+    border-right: 1px solid var(--line);
+    padding: 28px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.main-content {
+    flex: 1;
+    padding: 28px 36px 60px 36px;
+    min-width: 0;
+}
+
+/* ---------- Sidebar ---------- */
+.brand {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.brand-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.brand-title {
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--ink);
+}
+
+.brand-sub {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+}
+
+.sidebar-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.system-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.system-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    border: 1px solid transparent;
+    transition: background-color 0.12s ease;
+}
+
+.system-item:hover {
+    background-color: var(--bg);
+}
+
+.system-item.active {
+    background-color: var(--accent-soft);
+    color: var(--ink);
+    font-weight: 600;
+    border-color: rgba(43, 108, 176, 0.18);
+}
+
+.system-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sidebar-foot {
+    margin-top: auto;
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.5;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+}
+
+/* ---------- Topo / KPIs ---------- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 22px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.page-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+
+.page-sub {
+    font-size: 13px;
+    color: var(--ink-soft);
+    margin: 0;
+}
+
+.kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.kpi-card {
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+}
+
+.kpi-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1;
+}
+
+.kpi-delta {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+}
+
+/* ---------- Painéis ---------- */
+.panel {
+    background-color: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px 10px 20px;
+    margin-bottom: 20px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.panel-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.panel-note {
+    font-size: 11.5px;
+    color: var(--ink-soft);
+}
+
+.two-col {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+    align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+    .two-col { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ---------- Cartão de diagnóstico do tópico ---------- */
+.topic-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.topic-card-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 280px;
+    color: var(--ink-soft);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+}
+
+.topic-card-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background-color: var(--accent-soft);
+    padding: 3px 9px;
+    border-radius: 20px;
+    width: fit-content;
+    margin-bottom: 10px;
+}
+
+.topic-card-title {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 14px;
+}
+
+.topic-card-section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 4px;
+    margin-top: 14px;
+}
+
+.topic-card-section-text {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ink);
+}
+
+.topic-card-impact {
+    border-left: 3px solid var(--alert);
+    padding-left: 10px;
+    background-color: var(--alert-soft);
+    border-radius: 0 6px 6px 0;
+    padding: 8px 10px 8px 10px;
+}
+
+.topic-card-keywords {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.keyword-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    background-color: var(--bg);
+    border: 1px solid var(--line);
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+/* ---------- Dropdown e controles Dash ---------- */
+.Select-control, .dash-dropdown .Select-control {
+    border-radius: 7px !important;
+    border-color: var(--line) !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+    font-size: 13px !important;
+}
+
+/* ---------- Tabela ---------- */
+.dash-table-container {
+    font-family: 'IBM Plex Sans', sans-serif !important;
+}
+
+/* ---------- Scrollbar discreta ---------- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-thumb {
+    background-color: #D3D8DF;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}

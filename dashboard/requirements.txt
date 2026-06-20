@@ -1,0 +1,10 @@
+dash>=2.17
+dash-bootstrap-components>=1.6
+plotly>=5.22
+pandas>=2.0
+numpy>=1.24
+
+# Necessário apenas se load_topic_coordinates for usar o modelo BERTopic salvo
+# (já deve estar instalado se você rodou model_bertopic.py)
+bertopic
+umap-learn
