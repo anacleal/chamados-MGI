@@ -149,6 +149,71 @@ class BERTopic(BERTopic_):
         except Exception as e:
             print(f"  Erro ao calcular tópicos dominantes: {e}")
 
+    def save_topic_coordinates_2d(self, output_dir: str) -> None:
+        """
+        Calcula e salva coordenadas 2D dos tópicos a partir dos embeddings
+        SEMÂNTICOS reais (topic_embeddings_), e não do c-TF-IDF léxico usado
+        pelo visualize_topics() nativo do BERTopic.
+
+        Isso é intencional: como o clustering deste projeto (KMeans + UMAP)
+        já opera sobre os embeddings semânticos do SentenceTransformer, a
+        distância entre tópicos no mapa deve refletir a mesma noção de
+        similaridade — caso contrário, tópicos formados como semanticamente
+        distintos podem aparecer artificialmente próximos no c-TF-IDF (termos
+        de domínio restrito e vocabulário compartilhado entre chamados de TI
+        tendem a deixar o c-TF-IDF "genérico").
+
+        Usa um UMAP 2D dedicado, com a mesma SEED do projeto, separado do
+        UMAP usado para o clustering (que reduz para 5-15 componentes).
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        topic_embeddings = getattr(self, "topic_embeddings_", None)
+        if topic_embeddings is None:
+            print("  [AVISO] topic_embeddings_ não disponível — pulei coordenadas 2D.")
+            return
+
+        topic_info = self.get_topic_info()
+        topic_ids  = topic_info["Topic"].tolist()
+        topic_sizes = dict(zip(topic_info["Topic"], topic_info["Count"]))
+
+        # Remove o tópico -1 (outliers) antes de calcular o layout 2D,
+        # para não distorcer a projeção com um cluster artificial de "lixo"
+        mask = [t != -1 for t in topic_ids]
+        ids_validos  = [t for t, m in zip(topic_ids, mask) if m]
+        emb_validos  = np.array(topic_embeddings)[mask]
+
+        if len(ids_validos) < 3:
+            print("  [AVISO] Poucos tópicos válidos para projeção 2D — pulei.")
+            return
+
+        # Com poucos tópicos (5-10, como neste projeto), n_neighbors precisa
+        # ser BEM menor que o padrão (15) usado no clustering principal —
+        # caso contrário o UMAP "acha" quase todo mundo vizinho de todo mundo
+        # e a projeção 2D perde a separação entre grupos de tópicos distintos,
+        # ficando com aparência genérica/sem estrutura. n_neighbors=2 preserva
+        # vizinhança local mesmo com poucos pontos.
+        n_neighbors_2d = max(2, min(len(ids_validos) - 1, 2))
+
+        umap_2d = UMAP(
+            n_neighbors=n_neighbors_2d,
+            n_components=2,
+            metric="cosine",
+            min_dist=0.1,
+            random_state=SEED,
+        )
+        coords = umap_2d.fit_transform(emb_validos)
+
+        df_coords = pd.DataFrame({
+            "topico": ids_validos,
+            "x": coords[:, 0],
+            "y": coords[:, 1],
+            "n_documentos": [topic_sizes.get(t, 0) for t in ids_validos],
+        })
+
+        df_coords.to_csv(os.path.join(output_dir, "topic_coordinates_2d.csv"), index=False)
+        print(f"  Coordenadas 2D (embeddings semânticos) salvas em {output_dir}/topic_coordinates_2d.csv")
+
 
 # ---------------------------------------------------------------------------
 # Pipeline principal
@@ -264,6 +329,7 @@ def run_bertopic(docs: list, ids: list, sistema_nome: str, nr_topics: int) -> BE
     topic_model.save_json(  f"{results_dir}/topicos.json")
     topic_model.save_params(f"{results_dir}/parametros.json", umap_params=melhores_params)
     topic_model.dominant_topics(docs, results_dir, ids)
+    topic_model.save_topic_coordinates_2d(results_dir)
 
     # Visualizações interativas
     try:

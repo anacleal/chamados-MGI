@@ -39,6 +39,27 @@ app = dash.Dash(
 server = app.server
 
 
+@server.route("/bertopic-graph/<sistema>")
+def serve_bertopic_graph(sistema: str):
+    """
+    [Não utilizado pelo mapa principal — mantido apenas como referência.]
+    Serviria o intertopic_map.html nativo do BERTopic via <iframe>, caso
+    seja necessário no futuro. O mapa de tópicos do dashboard usa as
+    coordenadas extraídas desse mesmo HTML (ver data_loader.load_topic_coordinates),
+    renderizadas com o estilo visual do dashboard via Plotly/dcc.Graph.
+    """
+    from flask import send_file, abort
+
+    if sistema not in dl.SISTEMAS:
+        abort(404)
+
+    html_path = dl.get_intertopic_map_path(sistema)
+    if html_path is None:
+        abort(404)
+
+    return send_file(html_path)
+
+
 # ============================================================
 # COMPONENTES — SIDEBAR
 # ============================================================
@@ -63,11 +84,6 @@ def render_sidebar():
                 [
                     html.Div("PAINEL DE GARGALOS", className="brand-eyebrow"),
                     html.Div("Chamados de Suporte MGI", className="brand-title"),
-                    html.Div(
-                        "Modelagem de tópicos (BERTopic) e sumarização por LLM "
-                        "aplicadas aos sistemas SIASS, SIAPE, SIGEPE, SOUGOV e TOTAIS.",
-                        className="brand-sub",
-                    ),
                 ],
                 className="brand",
             ),
@@ -76,13 +92,6 @@ def render_sidebar():
                     html.Span("Sistema", className="sidebar-label"),
                     html.Div(items, className="system-list", id="system-list"),
                 ]
-            ),
-            html.Div(
-                [
-                    "Tópicos extraídos via BERTopic com seleção núcleo + periferia. ",
-                    "Resumos gerados por Llama 3.1 (Ollama local).",
-                ],
-                className="sidebar-foot",
             ),
         ],
         className="sidebar",
@@ -104,7 +113,7 @@ def render_kpis(sistema: str):
         ("CHAMADOS ANALISADOS", f"{n_docs:,}".replace(",", "."), "documentos classificados"),
         ("MÉDIA POR TÓPICO", f"{media_docs}".replace(".", ","), "chamados / tópico"),
         ("MAIOR GARGALO",
-         top_topico["titulo"][:28] + ("…" if len(top_topico["titulo"]) > 28 else "") if top_topico is not None else "—",
+         top_topico["titulo"] if top_topico is not None else "—",
          f"{int(top_topico['n_documentos'])} chamados" if top_topico is not None else ""),
     ]
 
@@ -113,7 +122,10 @@ def render_kpis(sistema: str):
             html.Div(
                 [
                     html.Div(label, className="kpi-label"),
-                    html.Div(value, className="kpi-value", style={"fontSize": "17px"} if i == 3 else {}),
+                    html.Div(
+                        value,
+                        className="kpi-value-title" if i == 3 else "kpi-value",
+                    ),
                     html.Div(delta, className="kpi-delta"),
                 ],
                 className="kpi-card",
@@ -126,6 +138,8 @@ def render_kpis(sistema: str):
 
 # ============================================================
 # COMPONENTES — MAPA INTERTÓPICOS
+# (coordenadas reais extraídas do intertopic_map.html, desenhadas com o
+#  estilo visual do dashboard — ver data_loader.load_topic_coordinates)
 # ============================================================
 def render_topic_map(sistema: str, topico_selecionado: int | None):
     coords = dl.load_topic_coordinates(sistema)
@@ -134,7 +148,7 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
 
     if coords is None or coords.empty:
         # Fallback: layout circular simples baseado apenas em volume,
-        # caso o modelo BERTopic salvo não esteja disponível neste ambiente.
+        # caso o intertopic_map.html ainda não tenha sido gerado para este sistema.
         import numpy as np
         n = len(tabela)
         if n == 0:
@@ -157,8 +171,19 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
     merged = coords.merge(tabela[["topico", "titulo"]], on="topico", how="left")
     merged["titulo"] = merged["titulo"].fillna(merged["topico"].apply(lambda t: f"Tópico {t}"))
 
-    sizes = merged["n_documentos"].clip(lower=1)
-    size_ref = 2.0 * sizes.max() / (46 ** 2) if sizes.max() > 0 else 1
+    import numpy as _np
+    raw = merged["n_documentos"].clip(lower=1).values.astype(float)
+    # Normaliza para [1, 10] com raiz quadrada para comprimir outliers,
+    # depois usa sizemode="area" com sizeref pequeno para que as diferenças
+    # de volume sejam claramente visíveis sem que os círculos se sobreponham.
+    sqrt_vals = _np.sqrt(raw)
+    vmin, vmax = sqrt_vals.min(), sqrt_vals.max()
+    if vmax > vmin:
+        norm = 1 + (sqrt_vals - vmin) / (vmax - vmin) * 9   # range [1, 10]
+    else:
+        norm = _np.full_like(sqrt_vals, 5.0)
+    sizes = norm
+    size_ref = 2.0 * norm.max() / (52 ** 2)
 
     is_selected = merged["topico"] == topico_selecionado
     line_widths = [3 if sel else 1 for sel in is_selected]
@@ -173,7 +198,7 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
         textposition="middle center",
         textfont=dict(size=11, color="white", family=FONT_FAMILY),
         marker=dict(
-            size=sizes, sizemode="area", sizeref=size_ref, sizemin=18,
+            size=sizes, sizemode="area", sizeref=size_ref, sizemin=14,
             color=cor, opacity=opacities,
             line=dict(width=line_widths, color=line_colors),
         ),
@@ -194,6 +219,7 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
         font=dict(family=FONT_FAMILY),
         showlegend=False,
         clickmode="event+select",
+        uirevision=sistema,
     )
     return fig
 
@@ -204,7 +230,7 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
 def render_topic_card(sistema: str, topico: int | None):
     if topico is None:
         return html.Div(
-            "Selecione um tópico no mapa ao lado, ou na tabela abaixo, "
+            "Selecione um tópico no ranking ou na tabela abaixo "
             "para ver o diagnóstico completo gerado pela sumarização.",
             className="topic-card-empty",
         )
@@ -260,25 +286,39 @@ def render_ranking_chart(sistema: str, topico_selecionado: int | None):
         "#1C2530" if t == topico_selecionado else cor
         for t in tabela["topico"]
     ]
-    labels = [f"T{t} · {tit[:26]}{'…' if len(tit) > 26 else ''}"
-              for t, tit in zip(tabela["topico"], tabela["titulo"])]
+    def _wrap_label(t, tit, max_chars=32):
+        prefix = f"T{t}"
+        if len(tit) <= max_chars:
+            return f"{prefix} · {tit}"
+        break_at = tit.rfind(" ", 0, max_chars)
+        if break_at == -1:
+            break_at = max_chars
+        linha1 = tit[:break_at].rstrip()
+        linha2 = tit[break_at:].strip()
+        if len(linha2) > max_chars:
+            linha2 = linha2[:max_chars - 1] + "…"
+        return f"{prefix} · {linha1}<br>       {linha2}"
+
+    labels = [_wrap_label(t, tit) for t, tit in zip(tabela["topico"], tabela["titulo"])]
 
     fig = go.Figure(go.Bar(
         x=tabela["n_documentos"],
         y=labels,
         orientation="h",
         marker=dict(color=colors),
-        customdata=tabela["topico"],
+        customdata=tabela[["topico"]],
         hovertemplate="<b>%{y}</b><br>%{x} chamados<extra></extra>",
     ))
     fig.update_layout(
-        height=max(280, 34 * len(tabela)),
+        height=max(320, 56 * len(tabela)),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        margin=dict(l=10, r=20, t=10, b=10),
-        font=dict(family=FONT_FAMILY, size=12, color="#1C2530"),
-        xaxis=dict(title="Nº de chamados", gridcolor="#E2E5EA"),
-        yaxis=dict(title=""),
+        margin=dict(l=20, r=30, t=10, b=40),
+        font=dict(family=FONT_FAMILY, size=13, color="#1C2530"),
+        xaxis=dict(title="Nº de chamados", gridcolor="#E2E5EA", tickfont=dict(size=12)),
+        yaxis=dict(title="", automargin=True, tickfont=dict(size=13), ticksuffix="      "),
+        clickmode="event+select",
+        uirevision=sistema,
     )
     return fig
 
@@ -353,8 +393,10 @@ def render_full_table(sistema: str):
     display.columns = ["Tópico", "Título", "Nº Chamados", "Padrão Dominante", "Impacto Operacional"]
 
     return dash_table.DataTable(
+        id={"type": "full-table-datatable", "index": sistema},
         data=display.to_dict("records"),
         columns=[{"name": c, "id": c} for c in display.columns],
+        cell_selectable=True,
         style_table={"overflowX": "auto"},
         style_cell={
             "fontFamily": "IBM Plex Sans, sans-serif",
@@ -381,9 +423,10 @@ def render_full_table(sistema: str):
             {"if": {"column_id": "Título"}, "width": "190px", "fontWeight": "600"},
             {"if": {"column_id": "Nº Chamados"}, "width": "100px", "fontFamily": "IBM Plex Mono, monospace"},
         ],
+        style_data={"cursor": "pointer"},
         page_size=10,
         sort_action="native",
-        filter_action="native",
+        filter_action="none",
     )
 
 
@@ -402,11 +445,6 @@ app.layout = html.Div(
                         html.Div(
                             [
                                 html.H1("Visão geral do sistema", className="page-title", id="page-title"),
-                                html.P(
-                                    "Gargalos identificados a partir da modelagem de tópicos e "
-                                    "sumarização automática dos chamados de suporte.",
-                                    className="page-sub",
-                                ),
                             ],
                             className="page-header",
                         ),
@@ -419,7 +457,7 @@ app.layout = html.Div(
                                             [
                                                 html.H3("Mapa de tópicos", className="panel-title"),
                                                 html.Span(
-                                                    "tamanho = volume de chamados · clique para detalhar",
+                                                    "tamanho = volume de chamados | distância = similaridade · clique para detalhar",
                                                     className="panel-note",
                                                 ),
                                             ],
@@ -445,7 +483,6 @@ app.layout = html.Div(
                                         html.Div(
                                             [
                                                 html.H3("Ranking de gargalos por volume", className="panel-title"),
-                                                html.Span("ordenado por nº de chamados", className="panel-note"),
                                             ],
                                             className="panel-header",
                                         ),
@@ -471,13 +508,6 @@ app.layout = html.Div(
                         ),
                         html.Div(
                             [
-                                html.Div(
-                                    [
-                                        html.H3("Todos os tópicos do sistema", className="panel-title"),
-                                        html.Span("revisão completa — filtre e ordene livremente", className="panel-note"),
-                                    ],
-                                    className="panel-header",
-                                ),
                                 html.Div(id="full-table"),
                             ],
                             className="panel",
@@ -495,16 +525,35 @@ app.layout = html.Div(
 # ============================================================
 # CALLBACKS
 # ============================================================
+def _extrair_topico_customdata(point: dict, indice: int | None = None):
+    """
+    Extrai o tópico de um ponto clicado no Plotly, de forma defensiva.
+    customdata pode chegar como escalar, lista, ou estar ausente
+    dependendo da versão do plotly.js e de qual elemento foi clicado.
+    """
+    cd = point.get("customdata")
+    if cd is None:
+        return None
+    if isinstance(cd, (list, tuple)):
+        if indice is not None and indice < len(cd):
+            return cd[indice]
+        return cd[0] if cd else None
+    # customdata veio como escalar direto
+    return cd
+
+
 @app.callback(
     Output("store-sistema", "data"),
     Output("store-topico", "data"),
     Input({"type": "system-item", "index": dash.ALL}, "n_clicks"),
     Input("topic-map", "clickData"),
     Input("ranking-chart", "clickData"),
+    Input({"type": "full-table-datatable", "index": dash.ALL}, "active_cell"),
+    State({"type": "full-table-datatable", "index": dash.ALL}, "data"),
     State("store-sistema", "data"),
     prevent_initial_call=True,
 )
-def atualizar_selecao(n_clicks_list, map_click, ranking_click, sistema_atual):
+def atualizar_selecao(n_clicks_list, map_click, ranking_click, active_cells, table_data_list, sistema_atual):
     ctx = dash.callback_context
     if not ctx.triggered:
         return dash.no_update, dash.no_update
@@ -519,13 +568,28 @@ def atualizar_selecao(n_clicks_list, map_click, ranking_click, sistema_atual):
 
     # Clique no mapa de tópicos
     if "topic-map" in trigger_id and map_click:
-        topico = map_click["points"][0]["customdata"][2]
-        return dash.no_update, topico
+        points = map_click.get("points") or []
+        if points:
+            topico = _extrair_topico_customdata(points[0], indice=2)
+            if topico is not None:
+                return dash.no_update, topico
+        return dash.no_update, dash.no_update
 
     # Clique no ranking
     if "ranking-chart" in trigger_id and ranking_click:
-        topico = ranking_click["points"][0]["customdata"]
-        return dash.no_update, topico
+        points = ranking_click.get("points") or []
+        if points:
+            topico = _extrair_topico_customdata(points[0], indice=0)
+            if topico is not None:
+                return dash.no_update, topico
+        return dash.no_update, dash.no_update
+
+    # Clique em uma linha da tabela completa
+    if "full-table-datatable" in trigger_id and active_cells:
+        for cell, data in zip(active_cells, table_data_list):
+            if cell:
+                row = data[cell["row"]]
+                return dash.no_update, row["Tópico"]
 
     return dash.no_update, dash.no_update
 

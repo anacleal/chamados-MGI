@@ -9,7 +9,7 @@ Centraliza a leitura de todos os artefatos gerados pelo pipeline:
 Estrutura de pastas esperada (raiz do projeto):
   data/                                  chamados_{sistema}.csv
   topic_modeling/bertopic_resultados/    {sistema}/Topicos_Dominantes.csv, topicos.json
-  topic_modeling/models/                 {sistema}/modelo  (modelo BERTopic salvo)
+  topic_modeling/bertopic_graphs/        {sistema}/intertopic_map.html (gerado nativamente pelo BERTopic)
   summarization/outLLM/detailed_summarization/{sistema}/  summary_topic_N.txt, titulo_topic_N.txt
   dashboard/                             <- este módulo roda daqui
 """
@@ -25,10 +25,11 @@ import pandas as pd
 # ============================================================
 # CAMINHOS BASE
 # ============================================================
+# dashboard/ é irmã de data/, topic_modeling/ e summarization/ na raiz do projeto
 BASE_DIR        = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR        = os.path.join(BASE_DIR, "data")
 TOPIC_RESULT_DIR = os.path.join(BASE_DIR, "topic_modeling", "bertopic_resultados")
-TOPIC_MODEL_DIR  = os.path.join(BASE_DIR, "topic_modeling", "models")
+TOPIC_GRAPH_DIR  = os.path.join(BASE_DIR, "topic_modeling", "bertopic_graphs")
 SUMMARY_DIR      = os.path.join(BASE_DIR, "summarization", "outLLM", "detailed_summarization")
 
 K_POR_SISTEMA = {
@@ -55,6 +56,7 @@ def _read_txt(path: str) -> str | None:
 
 
 def parse_summary(texto: str | None) -> dict:
+    """Extrai os campos Padrão Dominante e Impacto Operacional do texto bruto."""
     if not texto:
         return {"padrao_dominante": "", "impacto_operacional": ""}
 
@@ -153,64 +155,67 @@ def build_all_systems_table() -> pd.DataFrame:
 
 
 # ============================================================
-# COORDENADAS 2D DO MAPA INTERTÓPICOS (via modelo BERTopic salvo)
+# COORDENADAS 2D DO MAPA INTERTÓPICOS
+# (lidas de topic_coordinates_2d.csv, salvo por model_bertopic.py a partir
+#  dos embeddings SEMÂNTICOS reais dos tópicos — topic_embeddings_ — e não
+#  do c-TF-IDF léxico usado pelo visualize_topics() nativo do BERTopic.
+#  Isso mantém a mesma noção de similaridade usada para formar os clusters
+#  via KMeans, em vez de uma projeção léxica que tende a ficar "genérica"
+#  com vocabulário de domínio restrito.)
 # ============================================================
+def get_intertopic_map_path(sistema: str) -> str | None:
+    """
+    Retorna o caminho absoluto do intertopic_map.html nativo do BERTopic
+    para o sistema, se existir. Mantido apenas como referência/fallback
+    visual secundário — o mapa principal do dashboard usa
+    topic_coordinates_2d.csv (ver load_topic_coordinates).
+    """
+    path = os.path.join(TOPIC_GRAPH_DIR, sistema, "intertopic_map.html")
+    return path if os.path.exists(path) else None
+
+
 @functools.lru_cache(maxsize=None)
 def load_topic_coordinates(sistema: str) -> pd.DataFrame | None:
     """
-    Carrega o modelo BERTopic salvo e calcula as coordenadas 2D dos tópicos
-    a partir do espaço reduzido pelo UMAP do próprio modelo (mesma lógica
-    usada pelo visualize_topics() nativo do BERTopic).
+    Lê as coordenadas 2D dos tópicos salvas por
+    BERTopic.save_topic_coordinates_2d() em model_bertopic.py.
+
+    Essas coordenadas vêm de um UMAP 2D dedicado aplicado sobre
+    topic_embeddings_ (embeddings semânticos reais dos tópicos), e não
+    do c-TF-IDF léxico que o visualize_topics() nativo usa — por isso a
+    distância entre os pontos aqui reflete a mesma similaridade usada
+    para formar os clusters via KMeans no pipeline de modelagem.
 
     Retorna DataFrame: topico, x, y, n_documentos (prevalência)
     """
-    model_path = os.path.join(TOPIC_MODEL_DIR, sistema, "modelo")
-    if not os.path.exists(model_path):
+    path = os.path.join(TOPIC_RESULT_DIR, sistema, "topic_coordinates_2d.csv")
+    if not os.path.exists(path):
         return None
 
-    try:
-        # Import local para não exigir bertopic/torch quando não necessário
-        from bertopic import BERTopic
-        topic_model = BERTopic.load(model_path)
-
-        # topic_embeddings_ já é a representação centróide de cada tópico
-        # no espaço de embeddings original (antes do UMAP). Reduzimos para 2D
-        # com o próprio umap_model do modelo treinado, se disponível.
-        topic_embeddings = getattr(topic_model, "topic_embeddings_", None)
-        if topic_embeddings is None:
-            return None
-
-        umap_model = topic_model.umap_model
-        # Reduz para 2 componentes reaproveitando o umap_model treinado
-        # (transform funciona pois o modelo já foi ajustado no fit original)
-        try:
-            coords = umap_model.transform(topic_embeddings)
-        except Exception:
-            # Fallback: re-treina um UMAP 2D rápido só para visualização,
-            # caso o umap_model salvo não seja transformável (ex: n_components != 2)
-            from umap import UMAP
-            coords = UMAP(n_neighbors=15, n_components=2, metric="cosine",
-                           min_dist=0.0, random_state=42).fit_transform(topic_embeddings)
-
-        topic_info = topic_model.get_topic_info()
-        # Remove o tópico -1 (outliers), se existir, e mantém ordem de get_topic_info
-        topic_ids = topic_info["Topic"].tolist()
-
-        df = pd.DataFrame({
-            "topico": topic_ids,
-            "x": coords[:len(topic_ids), 0],
-            "y": coords[:len(topic_ids), 1],
-        })
-        df = df[df["topico"] >= 0].reset_index(drop=True)
-
-        contagem = count_docs_por_topico(sistema)
-        df["n_documentos"] = df["topico"].map(contagem).fillna(0).astype(int)
-
-        return df
-
-    except Exception as e:
-        print(f"[AVISO] Não foi possível calcular coordenadas 2D para {sistema}: {e}")
+    df = pd.read_csv(path)
+    required = {"topico", "x", "y"}
+    if not required.issubset(df.columns):
+        print(f"[AVISO] topic_coordinates_2d.csv de {sistema} sem colunas esperadas {required}.")
         return None
+
+    df = df[df["topico"] >= 0].reset_index(drop=True)
+
+    # Recalcula a contagem de documentos a partir da fonte mais atual
+    # (Resumo_Topicos_Dominantes.csv), em vez de confiar apenas no que foi
+    # salvo no momento do treino — garante consistência com o resto do dashboard.
+    contagem = count_docs_por_topico(sistema)
+    if contagem:
+        df["n_documentos"] = df["topico"].map(contagem).fillna(df.get("n_documentos", 0)).astype(int)
+    elif "n_documentos" not in df.columns:
+        df["n_documentos"] = 0
+
+    return df
+
+
+def get_topic_info_path(sistema: str) -> str | None:
+    """Retorna o caminho do topic_info.csv salvo junto com os gráficos do BERTopic."""
+    path = os.path.join(TOPIC_GRAPH_DIR, sistema, "topic_info.csv")
+    return path if os.path.exists(path) else None
 
 
 # ============================================================
