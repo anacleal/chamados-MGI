@@ -9,8 +9,15 @@ import pandas as pd
 if __package__ in (None, ""):
     sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from chatbot.config import CHAMADOS_CSV, CHATBOT_DATA_DIR, DATA_DIR, K_POR_SISTEMA, TOPICOS_CSV
+import os
 from dashboard import data_loader as dl
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+CHATBOT_DATA_DIR = BASE_DIR / "data" / "chatbot"
+CHAMADOS_CSV = CHATBOT_DATA_DIR / "df_chamados.csv"
+TOPICOS_CSV = CHATBOT_DATA_DIR / "df_topicos.csv"
+DATA_DIR = Path(dl.DATA_DIR)
+K_POR_SISTEMA = dl.K_POR_SISTEMA
 
 
 COL_ID = "Id"
