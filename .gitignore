@@ -7,3 +7,5 @@
 /topic_modeling/models
 /data/.idea
 /.idea/
+/chatbot/artifacts
+/chatbot/models
