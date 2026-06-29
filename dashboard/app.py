@@ -492,7 +492,7 @@ def get_initial_message():
                 html.Code("/top <numero>"), " define quantos chamados exibir (ex: /top 5)", html.Br(),
                 html.Code("/times"), " lista todos os times disponíveis", html.Br(),
                 html.Br(),
-                "🔍 ", html.Em("A busca respeita a aba de sistema selecionada no painel.")
+                html.Em("A busca respeita a aba de sistema selecionada no painel.")
             ], 
             style={"marginBottom": "20px", "backgroundColor": "#EBF8FF", "padding": "10px", "borderRadius": "8px", "fontSize": "14px"}
         )
@@ -518,7 +518,7 @@ def get_initial_message():
     return msgs
 
 chatbot_button = dbc.Button(
-    "💬 Assistente",
+    "Recomendador Inteligente",
     id="open-chatbot",
     color="primary",
     style={
@@ -551,7 +551,7 @@ chatbot_offcanvas = dbc.Offcanvas(
         ])
     ]),
     id="chatbot-offcanvas",
-    title="Assistente de Suporte",
+    title="Recomendador Inteligente",
     is_open=False,
     placement="end",
     style={"width": "450px"}
@@ -573,7 +573,7 @@ app.layout = html.Div(
         dbc.Modal(
             [
                 dbc.ModalHeader(dbc.ModalTitle("Aviso de Lentidão")),
-                dbc.ModalBody("O histórico do assistente possui muitos chamados carregados e abri-lo agora pode causar travamentos no seu navegador. Deseja limpar o histórico antes de abrir?"),
+                dbc.ModalBody("O histórico do recomendador possui muitos chamados carregados e abri-lo agora pode causar travamentos no seu navegador. Deseja limpar o histórico antes de abrir?"),
                 dbc.ModalFooter([
                     dbc.Button("Limpar e Abrir", id="btn-clear-chat", color="danger", className="ms-auto"),
                     dbc.Button("Abrir Mesmo Assim", id="btn-open-heavy-chat", color="secondary"),
@@ -829,7 +829,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         chat_history.append(
             html.Div(
                 [
-                    html.B("Assistente: "), 
+                    html.B("Recomendador: "), 
                     html.Span("Aguarde! O motor (RAG) ainda está sendo carregado no servidor.", style={"color": "#C53030"}),
                     html.Br(),
                     f"Status: {chatbot_status}. Tente novamente em alguns segundos."
@@ -848,7 +848,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         times_disponiveis = recommender.df_chamados['Time'].value_counts()
         lista_times = [html.Li(f"{time} ({count} chamados)") for time, count in times_disponiveis.items() if str(time).strip()]
         bot_response = html.Div(
-            [html.B("Assistente: "), "Times disponíveis na base:", html.Ul(lista_times)], 
+            [html.B("Recomendador: "), "Times disponíveis na base:", html.Ul(lista_times)], 
             style={"marginBottom": "20px", "fontSize": "14px"}
         )
         
@@ -857,12 +857,12 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         if novo_top.isdigit() and int(novo_top) > 0:
             chat_top = int(novo_top)
             bot_response = html.Div(
-                [html.B("Assistente: "), f"Configuração atualizada! O sistema agora listará as {chat_top} melhores recomendações."], 
+                [html.B("Recomendador: "), f"Configuração atualizada! O sistema agora listará as {chat_top} melhores recomendações."], 
                 style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
             )
         else:
             bot_response = html.Div(
-                [html.B("Assistente: "), "Erro: Por favor, informe um número válido maior que zero. (Ex: /top 5)"], 
+                [html.B("Recomendador: "), "Erro: Por favor, informe um número válido maior que zero. (Ex: /top 5)"], 
                 style={"marginBottom": "20px", "fontSize": "14px", "color": "#C53030"}
             )
             
@@ -871,12 +871,12 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         chat_time = novo_time if novo_time else None
         if chat_time:
             bot_response = html.Div(
-                [html.B("Assistente: "), f"Filtro de time aplicado: '{chat_time}'. As buscas agora priorizarão esse time."], 
+                [html.B("Recomendador: "), f"Filtro de time aplicado: '{chat_time}'. As buscas agora priorizarão esse time."], 
                 style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
             )
         else:
             bot_response = html.Div(
-                [html.B("Assistente: "), "Filtro de time removido."], 
+                [html.B("Recomendador: "), "Filtro de time removido."], 
                 style={"marginBottom": "20px", "fontSize": "14px"}
             )
 
@@ -886,7 +886,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         chamados = chamados_similares
         if not chamados:
             bot_response = html.Div(
-                [html.B("Assistente: "), f"ID {id_chamado} não encontrado."], 
+                [html.B("Recomendador: "), f"ID {id_chamado} não encontrado."], 
                 style={"marginBottom": "20px", "fontSize": "14px"}
             )
             
@@ -899,7 +899,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
             msg_filtro = f" no sistema '{sistema_input}'"
             if chat_time: msg_filtro += f" e time '{chat_time}'"
             bot_response = html.Div(
-                [html.B("Assistente: "), f"Não encontrei chamados similares{msg_filtro}."], 
+                [html.B("Recomendador: "), f"Não encontrei chamados similares{msg_filtro}."], 
                 style={"marginBottom": "20px", "fontSize": "14px"}
             )
         else:
@@ -938,7 +938,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
                 solucoes.append(card)
                 
             bot_response = html.Div([
-                html.B("Assistente: Encontrei as seguintes soluções históricas:"),
+                html.B("Recomendador: Encontrei as seguintes soluções históricas:"),
                 html.Div(solucoes, style={"marginTop": "10px"})
             ], style={"marginBottom": "20px", "fontSize": "14px"})
             
