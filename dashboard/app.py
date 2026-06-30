@@ -1,13 +1,3 @@
-"""
-Dashboard de Análise de Chamados — MGI
-========================================
-Visualização para identificação de gargalos operacionais a partir da
-modelagem de tópicos (BERTopic) e sumarização (Llama 3.1 via Ollama).
-
-Rodar com:  python app.py
-Acesse em:  http://127.0.0.1:8050
-"""
-
 import dash
 from dash import dcc, html, Input, Output, State, dash_table
 import dash_bootstrap_components as dbc
