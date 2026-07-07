@@ -62,8 +62,8 @@ class ProcessadorBase:
 
 if __name__ == "__main__":
     # caminhos
-    ARQUIVO_ENTRADA = "../data/chatbot_table.csv"
-    ARQUIVO_SAIDA = "../data/chatbot_table_drop.csv"
+    ARQUIVO_ENTRADA = "../data/base_de_dados.csv"
+    ARQUIVO_SAIDA = "../data/base_clean.csv"
 
     # Execução em Pipeline (encadeada)
     processador = ProcessadorBase(ARQUIVO_ENTRADA)

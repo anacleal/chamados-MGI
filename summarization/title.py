@@ -45,6 +45,7 @@ RESUMOS_DIR = "outLLM/detailed_summarization"
 SYSTEM_PROMPT = """\
 You are a topic labeling specialist for Brazilian government IT support systems.
 You will receive the summary of one topic cluster and must generate a single short title for it.
+Do not reuse suffix patterns or structural templates from previously used titles, even if the wording itself differs.
 
 [RULES]
 - The title must be in Brazilian Portuguese (pt-BR).

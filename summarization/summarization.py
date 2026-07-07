@@ -143,16 +143,11 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
 # ============================================================
 # PROMPT DE SUMARIZAÇÃO
 # ============================================================
-_EXEMPLO = """
-**Padrão Dominante**: Falha na integração entre SIAPE e SIASS impede que afastamentos registrados em um sistema sejam refletidos automaticamente no outro. O problema se manifesta tanto em afastamentos recentes quanto em registros antigos que já deveriam ter sido sincronizados. Quando o servidor muda de lotação, o histórico de afastamentos do órgão anterior fica inacessível para a nova unidade, exigindo intervenção manual da equipe de suporte para cada caso.
-
-**Impacto Operacional**: As unidades precisam lançar afastamentos manualmente em duplicidade, gerando inconsistências nos registros de licença médica e atrasando o processamento da folha de pagamento.
-""".strip()
 
 SYSTEM_PROMPT = """\
 You are a data analysis pipeline specialized in identifying operational bottlenecks in Brazilian \
 government IT support systems. You will receive a set of support tickets (chamados) from a \
-specific topic cluster identified by a topic modeling algorithm. The tickets are written in \
+specific topic identified by a topic modeling algorithm. The tickets are written in \
 Brazilian Portuguese (pt-BR).
 
 [CONTEXT]
@@ -160,7 +155,13 @@ The tickets were selected from a BERTopic cluster. The first group (labeled NÚC
 the most representative tickets of the topic. The second group (labeled PERIFERIA) contains \
 more peripheral tickets that still belong to the same topic.
 The keywords listed below were extracted by BERTopic and represent the dominant terms of \
-this cluster — use them as a secondary signal to interpret the tickets.
+this topic — use them as a secondary signal to interpret the tickets.
+
+[AUDIENCE]
+The output will be read by non-technical civil servants at MGI (Ministério da Gestão e da \
+Inovação em Serviços Públicos) who have no background in data science or machine learning. \
+Write as if describing a recurring operational problem directly, not as if describing the \
+output of an algorithm.
 
 [ANONYMIZATION RULE]
 Replace ALL personal data (names, CPFs, registration numbers, e-mails, phone numbers) with \
@@ -168,7 +169,7 @@ Replace ALL personal data (names, CPFs, registration numbers, e-mails, phone num
 
 [TASK]
 Read all tickets and produce a structured report with exactly two fields:
-1. What is the dominant pattern in this cluster? (the core issue or behavior these tickets share)
+1. What is the dominant pattern in these tickets? (the core issue or behavior these tickets share)
 2. What is the operational impact? (what this causes in practice for users and operators)
 
 [OUTPUT FORMAT — FOLLOW EXACTLY]
@@ -188,9 +189,7 @@ Do not describe consequences here — save those for Impacto Operacional.]
 
 **Impacto Operacional**: [One or two sentences on the practical consequences for users and operators.]
 
-[CORRECT OUTPUT EXAMPLE]
-{exemplo}
-""".format(exemplo=_EXEMPLO)
+"""
 
 
 # ============================================================

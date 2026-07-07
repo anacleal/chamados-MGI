@@ -3,8 +3,55 @@ from dash import dcc, html, Input, Output, State, dash_table
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
+import os
+import threading
+import sys
+from pathlib import Path
+import dash_auth
 
 import data_loader as dl
+
+chatbot_path = Path(__file__).resolve().parent.parent / "chatbot"
+if str(chatbot_path) not in sys.path:
+    sys.path.append(str(chatbot_path))
+
+recommender = None
+chatbot_status = "Carregando"
+
+def load_chatbot_background():
+    import time
+    # Pequena pausa para garantir que o Dash suba o servidor e renderize a página imediatamente
+    time.sleep(2)
+
+    global recommender, chatbot_status
+    try:
+        import os
+        from pathlib import Path
+        base_dir = Path(__file__).resolve().parent.parent
+        path_topicos = base_dir / 'data' / 'chatbot' / 'df_topicos.csv'
+        path_chamados = base_dir / 'data' / 'chatbot' / 'df_chamados.csv'
+
+        if not (os.path.exists(path_topicos) and os.path.exists(path_chamados)):
+            chatbot_status = "Construindo base de dados (Vetorizando chamados)..."
+            import build_datasets  # type: ignore
+            build_datasets.build_csvs()
+            chatbot_status = "Carregando motor de busca..."
+
+        from rag_data_loader import carregar_dados as carregar_dados_chatbot  # type: ignore
+        from embeddings_manager import carregar_modelo_embedding, get_embeddings  # type: ignore
+        from search_engine import SearchEngine  # type: ignore
+        from recommender import RecommenderSystem  # type: ignore
+
+        _df_topicos, _df_chamados = carregar_dados_chatbot()
+        _emb_model = carregar_modelo_embedding()
+        _emb_t, _emb_c = get_embeddings(_df_topicos, _df_chamados, _emb_model)
+        _search_engine = SearchEngine(_df_topicos, _df_chamados, _emb_t, _emb_c, _emb_model)
+        recommender = RecommenderSystem(_search_engine, _df_chamados)
+        chatbot_status = "Pronto"
+    except Exception as e:
+        chatbot_status = f"Erro: {e}"
+
+threading.Thread(target=load_chatbot_background, daemon=True).start()
 
 # ============================================================
 # CORES POR SISTEMA
@@ -27,6 +74,11 @@ app = dash.Dash(
     suppress_callback_exceptions=True,
 )
 server = app.server
+
+VALID_USERNAME_PASSWORD = {
+    "mgi": "avaliação_mgi"
+}
+auth = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD)
 
 
 @server.route("/bertopic-graph/<sistema>")
@@ -421,12 +473,114 @@ def render_full_table(sistema: str):
 
 
 # ============================================================
+# COMPONENTES DO CHATBOT (UI)
+# ============================================================
+def get_initial_message():
+    global chatbot_status
+    msgs = [
+        html.Div(
+            [
+                html.B("SISTEMA DE BUSCA E RECOMENDAÇÃO DE SUPORTE"),
+                html.Br(), html.Br(),
+                "Descreva o problema ou use um dos comandos abaixo:", html.Br(),
+                html.Code("/id <numero>"), " recomenda baseado em um ID existente", html.Br(),
+                html.Code("/time <nome>"), " filtra recomendação para um time especifico", html.Br(),
+                html.Code("/top <numero>"), " define quantos chamados exibir (ex: /top 5)", html.Br(),
+                html.Code("/times"), " lista todos os times disponíveis", html.Br(),
+                html.Br(),
+                html.Em("A busca respeita a aba de sistema selecionada no painel.")
+            ],
+            style={"marginBottom": "20px", "backgroundColor": "#EBF8FF", "padding": "10px", "borderRadius": "8px", "fontSize": "14px"}
+        )
+    ]
+
+    # A mensagem de carregamento sempre faz parte do histórico inicial
+    status_str = str(chatbot_status) if chatbot_status else ""
+    msgs.append(
+        html.Div(
+            [html.B("Sistema: "), "Aguarde, inicializando o motor de busca... (Vetorizando chamados)" if "Construindo" in status_str else "Aguarde, inicializando o motor de busca... (Carregando)"],
+            style={"marginBottom": "20px", "color": "#C53030", "fontSize": "14px"}
+        )
+    )
+
+    if status_str == "Pronto" or "Erro" in status_str:
+        msgs.append(
+            html.Div(
+                [html.B("Sistema: "), "Motor de busca carregado e pronto para uso!" if status_str == "Pronto" else f"Falha: {status_str}"],
+                style={"marginBottom": "20px", "color": "#2F855A" if status_str == "Pronto" else "#C53030", "fontSize": "14px"}
+            )
+        )
+
+    return msgs
+
+chatbot_button = dbc.Button(
+    "Recomendador Inteligente",
+    id="open-chatbot",
+    color="primary",
+    style={
+        "position": "fixed",
+        "bottom": "20px",
+        "right": "100px",
+        "borderRadius": "50px",
+        "zIndex": 9999,
+        "boxShadow": "0px 4px 10px rgba(0,0,0,0.2)"
+    }
+)
+
+chatbot_offcanvas = dbc.Offcanvas(
+    html.Div([
+        html.Div(
+            id="chatbot-messages",
+            children=get_initial_message(),
+            style={
+                "height": "75vh",
+                "overflowY": "auto",
+                "padding": "10px",
+                "backgroundColor": "#F7F8FA",
+                "borderRadius": "8px",
+                "marginBottom": "10px"
+            }
+        ),
+        dbc.InputGroup([
+            dbc.Input(id="chatbot-input", placeholder="Descreva o problema...", n_submit=0),
+            dbc.Button("Enviar", id="chatbot-submit", color="primary")
+        ])
+    ]),
+    id="chatbot-offcanvas",
+    title="Recomendador Inteligente",
+    is_open=False,
+    placement="end",
+    style={"width": "450px"}
+)
+
+
+# ============================================================
 # LAYOUT PRINCIPAL
 # ============================================================
 app.layout = html.Div(
     [
         dcc.Store(id="store-sistema", data=dl.SISTEMAS[0]),
         dcc.Store(id="store-topico", data=None),
+        dcc.Store(id="store-chat-top", data=3),
+        dcc.Store(id="store-chat-time", data=None),
+        dcc.Store(id="chatbot-announced", data=False),
+        dcc.Interval(id="chatbot-load-interval", interval=2000, n_intervals=0),
+        dcc.Store(id="chat-size", data=0),
+        dbc.Modal(
+            [
+                dbc.ModalHeader(dbc.ModalTitle("Aviso de Lentidão")),
+                dbc.ModalBody("O histórico do recomendador possui muitos chamados carregados e abri-lo agora pode causar travamentos no seu navegador. Deseja limpar o histórico antes de abrir?"),
+                dbc.ModalFooter([
+                    dbc.Button("Limpar e Abrir", id="btn-clear-chat", color="danger", className="ms-auto"),
+                    dbc.Button("Abrir Mesmo Assim", id="btn-open-heavy-chat", color="secondary"),
+                ]),
+            ],
+            id="heavy-chat-modal",
+            is_open=False,
+            centered=True,
+        ),
+        chatbot_button,
+        chatbot_offcanvas,
         html.Div(
             [
                 render_sidebar(),
@@ -513,8 +667,295 @@ app.layout = html.Div(
 
 
 # ============================================================
-# CALLBACKS
+# CALLBACKS DO CHATBOT E CLIENTSIDE
 # ============================================================
+app.clientside_callback(
+    """
+    function(children) {
+        setTimeout(function(){
+            var objDiv = document.getElementById('chatbot-messages');
+            if (objDiv) {
+                objDiv.scrollTop = objDiv.scrollHeight;
+            }
+        }, 100);
+        return window.dash_clientside.no_update;
+    }
+    """,
+    Output("chatbot-messages", "id"),
+    Input("chatbot-messages", "children")
+)
+
+@app.callback(
+    Output("open-chatbot", "style"),
+    Output("chatbot-submit", "style"),
+    Input("store-sistema", "data")
+)
+def atualizar_cores_chatbot(sistema):
+    cor = COR_SISTEMA.get(sistema, "#2B6CB0")
+    btn_style = {
+        "position": "fixed",
+        "bottom": "20px",
+        "left": "20px",
+        "borderRadius": "50px",
+        "zIndex": 9999,
+        "boxShadow": "0px 4px 10px rgba(0,0,0,0.2)",
+        "backgroundColor": cor,
+        "borderColor": cor,
+        "color": "white"
+    }
+    submit_style = {
+        "backgroundColor": cor,
+        "borderColor": cor,
+        "color": "white"
+    }
+    return btn_style, submit_style
+
+@app.callback(
+    Output("chatbot-offcanvas", "is_open"),
+    Output("heavy-chat-modal", "is_open"),
+    Input("open-chatbot", "n_clicks"),
+    Input("btn-open-heavy-chat", "n_clicks"),
+    Input("btn-clear-chat", "n_clicks"),
+    State("chatbot-offcanvas", "is_open"),
+    State("chat-size", "data"),
+    prevent_initial_call=True
+)
+def handle_open_chat(n_open, n_proceed, n_clear, is_open, chat_size):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update
+
+    trigger_id = ctx.triggered[0]["prop_id"]
+
+    if "open-chatbot" in trigger_id:
+        if not is_open and chat_size and chat_size > 50000:
+            # Ao invés de abrir o chat direto, mostra o modal
+            return False, True
+        else:
+            return not is_open, False
+
+    if "btn-open-heavy-chat" in trigger_id:
+        return True, False
+
+    if "btn-clear-chat" in trigger_id:
+        return True, False
+
+    return dash.no_update, dash.no_update
+
+
+
+@app.callback(
+    Output("chatbot-messages", "children", allow_duplicate=True),
+    Output("chatbot-load-interval", "disabled"),
+    Output("chatbot-announced", "data"),
+    Input("chatbot-load-interval", "n_intervals"),
+    State("chatbot-messages", "children"),
+    State("chatbot-announced", "data"),
+    prevent_initial_call=True
+)
+def update_chatbot_status(n, chat_history, announced):
+    global chatbot_status
+    if announced:
+        return dash.no_update, True, dash.no_update
+
+    if not chat_history:
+        chat_history = get_initial_message()
+
+    if "Construindo" in chatbot_status or "Carregando" in chatbot_status:
+        # get_initial_message já inclui a mensagem de carregamento, não precisamos fazer nada
+        return dash.no_update, False, False
+
+    if chatbot_status == "Pronto" or "Erro" in chatbot_status:
+
+        # Para evitar duplicação, verificamos se a última string diz "pronto para uso"
+        ultimo_texto = str(chat_history[-1]) if chat_history else ""
+        if "pronto para uso" not in ultimo_texto and "Falha" not in ultimo_texto:
+            msg = html.Div(
+                [html.B("Sistema: "), "Motor de busca carregado e pronto para uso!" if chatbot_status == "Pronto" else f"Falha: {chatbot_status}"],
+                style={"marginBottom": "20px", "color": "#2F855A" if chatbot_status == "Pronto" else "#C53030", "fontSize": "14px"}
+            )
+            chat_history.append(msg)
+            return chat_history, True, True
+
+        return dash.no_update, True, True
+
+    return dash.no_update, False, False
+
+@app.callback(
+    Output("chatbot-messages", "children"),
+    Output("chatbot-input", "value"),
+    Output("store-chat-top", "data"),
+    Output("store-chat-time", "data"),
+    Output("chat-size", "data"),
+    Input("chatbot-submit", "n_clicks"),
+    Input("chatbot-input", "n_submit"),
+    Input("store-sistema", "data"),
+    State("chatbot-input", "value"),
+    State("chatbot-messages", "children"),
+    State("store-chat-top", "data"),
+    State("store-chat-time", "data"),
+    prevent_initial_call=True
+)
+def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history, chat_top, chat_time):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+    trigger_id = ctx.triggered[0]["prop_id"]
+
+    # Se o sistema mudou (mudança de aba), reseta tudo!
+    if "store-sistema" in trigger_id:
+        return get_initial_message(), "", 3, None, 0
+
+    if not user_text:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+
+    if chat_history is None or len(chat_history) == 0:
+        chat_history = get_initial_message()
+
+    chat_history.append(
+        html.Div(
+            [html.B("Você: "), user_text],
+            style={"marginBottom": "10px", "textAlign": "right", "color": "#2B6CB0", "fontSize": "14px"}
+        )
+    )
+
+    global recommender, chatbot_status
+    if recommender is None:
+        chat_history.append(
+            html.Div(
+                [
+                    html.B("Recomendador: "),
+                    html.Span("Aguarde! O motor (RAG) ainda está sendo carregado no servidor.", style={"color": "#C53030"}),
+                    html.Br(),
+                    f"Status: {chatbot_status}. Tente novamente em alguns segundos."
+                ],
+                style={"marginBottom": "20px", "backgroundColor": "#FED7D7", "padding": "10px", "borderRadius": "8px", "fontSize": "14px"}
+            )
+        )
+        return chat_history, "", chat_top, chat_time
+
+    user_text_lower = user_text.lower()
+    bot_response = None
+    chamados = []
+
+    # Processa comandos
+    if user_text_lower == '/times':
+        times_disponiveis = recommender.df_chamados['Time'].value_counts()
+        lista_times = [html.Li(f"{time} ({count} chamados)") for time, count in times_disponiveis.items() if str(time).strip()]
+        bot_response = html.Div(
+            [html.B("Recomendador: "), "Times disponíveis na base:", html.Ul(lista_times)],
+            style={"marginBottom": "20px", "fontSize": "14px"}
+        )
+
+    elif user_text_lower.startswith('/top '):
+        novo_top = user_text_lower[5:].strip()
+        if novo_top.isdigit() and int(novo_top) > 0:
+            chat_top = int(novo_top)
+            bot_response = html.Div(
+                [html.B("Recomendador: "), f"Configuração atualizada! O sistema agora listará as {chat_top} melhores recomendações."],
+                style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
+            )
+        else:
+            bot_response = html.Div(
+                [html.B("Recomendador: "), "Erro: Por favor, informe um número válido maior que zero. (Ex: /top 5)"],
+                style={"marginBottom": "20px", "fontSize": "14px", "color": "#C53030"}
+            )
+
+    elif user_text_lower.startswith('/time '):
+        novo_time = user_text_lower[6:].strip()
+        chat_time = novo_time if novo_time else None
+        if chat_time:
+            bot_response = html.Div(
+                [html.B("Recomendador: "), f"Filtro de time aplicado: '{chat_time}'. As buscas agora priorizarão esse time."],
+                style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
+            )
+        else:
+            bot_response = html.Div(
+                [html.B("Recomendador: "), "Filtro de time removido."],
+                style={"marginBottom": "20px", "fontSize": "14px"}
+            )
+
+    elif user_text_lower.startswith('/id '):
+        id_chamado = user_text[4:].strip()
+        chamados_similares = recommender.buscar_por_id(id_chamado, top_k=chat_top)
+        chamados = chamados_similares
+        if not chamados:
+            bot_response = html.Div(
+                [html.B("Recomendador: "), f"ID {id_chamado} não encontrado."],
+                style={"marginBottom": "20px", "fontSize": "14px"}
+            )
+
+    else:
+        resultado = recommender.recomendar_solucao(user_text, top_k=chat_top, filtro_sistema=sistema_input, filtro_time=chat_time)
+        chamados = resultado.get("chamados_recomendados", [])
+
+    if bot_response is None:
+        if not chamados:
+            msg_filtro = f" no sistema '{sistema_input}'"
+            if chat_time: msg_filtro += f" e time '{chat_time}'"
+            bot_response = html.Div(
+                [html.B("Recomendador: "), f"Não encontrei chamados similares{msg_filtro}."],
+                style={"marginBottom": "20px", "fontSize": "14px"}
+            )
+        else:
+            solucoes = []
+            for i, c in enumerate(chamados, 1):
+                titulo = str(c.get('Título', 'Sem título'))
+                acao = str(c.get('Última ação de acompanhamento', 'Sem ação'))
+                if acao == "nan":
+                    acao = "Sem última ação de acompanhamento documentada."
+                desc = str(c.get('Descrição do chamado', 'Sem descrição'))
+                id_ = str(c.get('Id', 'Sem ID'))
+                time_ = str(c.get('Time', 'Sem time'))
+                score = c.get('score_similaridade', 0)
+
+                resumo_acao = acao[:100] + "..." if len(acao) > 100 else acao
+
+                card = html.Div([
+                    html.Details([
+                        html.Summary(
+                            html.Strong(f"[{i}] {titulo} (Score: {score:.0%})", style={"cursor": "pointer", "color": "#2B6CB0"}),
+                            style={"outline": "none"}
+                        ),
+                        html.Div([
+                            html.P([html.B("Time: "), time_], style={"margin": "2px 0"}),
+                            html.Hr(style={"margin": "8px 0"}),
+                            html.P([html.B("ID: "), id_], style={"margin": "2px 0"}),
+                            html.Hr(style={"margin": "8px 0"}),
+                            html.P([html.B("Descrição do Problema:"), html.Br(), desc], style={"margin": "2px 0"}),
+                            html.Hr(style={"margin": "8px 0"}),
+                            html.P([html.B("Solução (Ação de Acompanhamento):"), html.Br(), acao], style={"margin": "2px 0"})
+                        ], style={"padding": "10px", "backgroundColor": "#F9FAFB", "border": "1px solid #E2E8F0", "borderRadius": "5px", "marginTop": "8px", "fontSize": "13px"})
+                    ]),
+                    html.Div(html.Em(resumo_acao), style={"marginTop": "5px", "color": "#718096", "fontSize": "13px"})
+                ], style={"padding": "12px", "backgroundColor": "#fff", "border": "1px solid #E2E8F0", "borderRadius": "8px", "marginBottom": "10px", "boxShadow": "0 1px 3px rgba(0,0,0,0.05)"})
+
+                solucoes.append(card)
+
+            bot_response = html.Div([
+                html.B("Recomendador: Encontrei as seguintes soluções históricas:"),
+                html.Div(solucoes, style={"marginTop": "10px"})
+            ], style={"marginBottom": "20px", "fontSize": "14px"})
+
+    chat_history.append(bot_response)
+
+    # Calculo matemático do peso do histórico
+    peso_historico = len(str(chat_history))
+
+    return chat_history, "", chat_top, chat_time, peso_historico
+
+@app.callback(
+    Output("chatbot-messages", "children", allow_duplicate=True),
+    Output("chat-size", "data", allow_duplicate=True),
+    Input("btn-clear-chat", "n_clicks"),
+    prevent_initial_call=True
+)
+def clear_chat_history(submit_n_clicks):
+    if submit_n_clicks:
+        return get_initial_message(), 0
+    return dash.no_update, dash.no_update
+
 def _extrair_topico_customdata(point: dict, indice: int | None = None):
     """
     Extrai o tópico de um ponto clicado no Plotly, de forma defensiva.
@@ -639,4 +1080,4 @@ def atualizar_pagina(sistema, topico):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=8050)
+    app.run(debug=False, port=8050)
