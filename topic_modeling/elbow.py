@@ -8,12 +8,7 @@ from sentence_transformers import SentenceTransformer
 from umap import UMAP
 from sklearn.cluster import KMeans
 
-
-# ==========================================
-# 1. BLOCO DE DETERMINISMO GLOBAL
-# ==========================================
 def set_global_determinism(seed=42):
-    """Garante reprodutibilidade total para a publicação do artigo."""
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
@@ -25,23 +20,16 @@ def set_global_determinism(seed=42):
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-
 set_global_determinism(42)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-
-# ==========================================
-# 2. FUNÇÃO DO MÉTODO DO COTOVELO
-# ==========================================
 def plot_elbow_method(sistemas, col_texto="Descrição do chamado", k_min=2, k_max=25):
-    # Carrega o modelo de embedding UMA ÚNICA VEZ para economizar tempo
     print(f"Carregando modelo de embeddings no device: {DEVICE.upper()}...")
     embedding_model = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", device=DEVICE)
 
     for sis in sistemas:
         csv_path = f"../data/chamados_{sis}.csv"
-        # Pasta onde os gráficos serão salvos
         output_dir = f"bertopic_resultados/analise_cotovelo"
         os.makedirs(output_dir, exist_ok=True)
 
@@ -58,38 +46,31 @@ def plot_elbow_method(sistemas, col_texto="Descrição do chamado", k_min=2, k_m
             print(f"[{sis.upper()}] Documentos insuficientes ({len(docs)}). Pulando...")
             continue
 
-        # PASSO A: Gerar Embeddings Densos
         print(f"[{sis.upper()}] Gerando embeddings para {len(docs)} documentos...")
         embeddings = embedding_model.encode(docs, show_progress_bar=True)
 
-        # PASSO B: Redução com UMAP (Idêntico ao setup do seu BERTopic)
         print(f"[{sis.upper()}] Reduzindo dimensionalidade com UMAP...")
         umap_model = UMAP(n_neighbors=15, n_components=5, min_dist=0.0, metric='cosine', random_state=42)
         reduced_embeddings = umap_model.fit_transform(embeddings)
 
-        # PASSO C: Calcular WCSS (Inércia) para diferentes Ks
         print(f"[{sis.upper()}] Calculando K-Means para K de {k_min} até {k_max}...")
         wcss = []
         K_range = range(k_min, k_max + 1)
 
         for k in K_range:
-            # n_init=10 evita warnings em versões recentes do sklearn
             kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
             kmeans.fit(reduced_embeddings)
             wcss.append(kmeans.inertia_)
 
-        # PASSO D: Gerar e Salvar o Gráfico
         plt.figure(figsize=(10, 6))
         plt.plot(K_range, wcss, marker='o', linestyle='-', color='#1f77b4', linewidth=2, markersize=8)
 
-        # Estilização padrão "Artigo Científico"
         plt.title(f'Método do Cotovelo (Elbow Method) - {sis.upper()}', fontsize=16, fontweight='bold')
         plt.xlabel('Número de Clusters (k)', fontsize=14)
         plt.ylabel('Soma dos Quadrados Intra-Cluster (WCSS)', fontsize=14)
         plt.xticks(K_range)
         plt.grid(True, linestyle='--', alpha=0.7)
 
-        # Salva em alta resolução (300 dpi é exigência comum em conferências)
         plot_path = os.path.join(output_dir, f'grafico_cotovelo_{sis}.png')
         plt.savefig(plot_path, dpi=300, bbox_inches='tight')
         plt.close()
@@ -98,7 +79,5 @@ def plot_elbow_method(sistemas, col_texto="Descrição do chamado", k_min=2, k_m
 
 
 if __name__ == "__main__":
-    # Teste de K variando de 2 até 25 clusters.
-    # Você pode ajustar k_max dependendo da complexidade do dataset.
     sistemas_alvo = ["siape", "siass", "sigepe", "sougov", "totais"]
     plot_elbow_method(sistemas_alvo, k_min=2, k_max=25)

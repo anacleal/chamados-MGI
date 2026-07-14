@@ -1,6 +1,4 @@
 import pandas as pd
-import numpy as np
-
 
 class ProcessadorBase:
     def __init__(self, input_path):
@@ -28,7 +26,6 @@ class ProcessadorBase:
         # Cálculo do tempo total em horas
         delta_horas = ((self.df['Data de Solução'] - self.df['Data de abertura']) / pd.Timedelta(hours=1)).round(1)
 
-        # Insere após 'Data de Solução' se existir, senão no final
         if 'Data de Solução' in self.df.columns:
             idx = self.df.columns.get_loc('Data de Solução')
             self.df.insert(idx + 1, 'Tempo em horas do atendimento', delta_horas)
@@ -40,8 +37,6 @@ class ProcessadorBase:
     def filtrar_colunas_finais(self):
 
         print("-> Removendo colunas inúteis...")
-
-        # Lista de colunas que o sistema gera e você NÃO quer na análise
         colunas_lixo = [
             'Total_Horas', 'Tempo de atendimento', 'Tempo total',
             'Tempo de Interação', 'Tempo de interação dentro do SLA',
@@ -49,7 +44,6 @@ class ProcessadorBase:
             'Origem da requisição', 'Prioridade', 'Total em Minutos'
         ]
 
-        # O drop só acontece se a coluna existir de fato
         self.df.drop(columns=[c for c in colunas_lixo if c in self.df.columns], inplace=True)
         return self
 
@@ -61,11 +55,9 @@ class ProcessadorBase:
 
 
 if __name__ == "__main__":
-    # caminhos
     ARQUIVO_ENTRADA = "../data/base_de_dados.csv"
     ARQUIVO_SAIDA = "../data/base_clean.csv"
 
-    # Execução em Pipeline (encadeada)
     processador = ProcessadorBase(ARQUIVO_ENTRADA)
 
     (processador

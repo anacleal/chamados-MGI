@@ -3,7 +3,6 @@ from dash import dcc, html, Input, Output, State, dash_table
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import pandas as pd
-import os
 import threading
 import sys
 from pathlib import Path
@@ -20,7 +19,6 @@ chatbot_status = "Carregando"
 
 def load_chatbot_background():
     import time
-    # Pequena pausa para garantir que o Dash suba o servidor e renderize a página imediatamente
     time.sleep(2)
 
     global recommender, chatbot_status
@@ -53,9 +51,7 @@ def load_chatbot_background():
 
 threading.Thread(target=load_chatbot_background, daemon=True).start()
 
-# ============================================================
 # CORES POR SISTEMA
-# ============================================================
 COR_SISTEMA = {
     "SIASS":  "#2B6CB0",
     "SIAPE":  "#2F7D6B",
@@ -83,13 +79,8 @@ auth = dash_auth.BasicAuth(app, VALID_USERNAME_PASSWORD)
 
 @server.route("/bertopic-graph/<sistema>")
 def serve_bertopic_graph(sistema: str):
-    """
-    [Não utilizado pelo mapa principal — mantido apenas como referência.]
-    Serviria o intertopic_map.html nativo do BERTopic via <iframe>, caso
-    seja necessário no futuro. O mapa de tópicos do dashboard usa as
-    coordenadas extraídas desse mesmo HTML (ver data_loader.load_topic_coordinates),
-    renderizadas com o estilo visual do dashboard via Plotly/dcc.Graph.
-    """
+    #[Não utilizado pelo mapa principal]
+
     from flask import send_file, abort
 
     if sistema not in dl.SISTEMAS:
@@ -102,9 +93,7 @@ def serve_bertopic_graph(sistema: str):
     return send_file(html_path)
 
 
-# ============================================================
 # COMPONENTES — SIDEBAR
-# ============================================================
 def render_sidebar():
     items = []
     for sis in dl.SISTEMAS:
@@ -140,9 +129,7 @@ def render_sidebar():
     )
 
 
-# ============================================================
 # COMPONENTES — KPIs
-# ============================================================
 def render_kpis(sistema: str):
     tabela = dl.build_topic_table(sistema)
     n_topicos = len(tabela)
@@ -178,19 +165,13 @@ def render_kpis(sistema: str):
     )
 
 
-# ============================================================
 # COMPONENTES — MAPA INTERTÓPICOS
-# (coordenadas reais extraídas do intertopic_map.html, desenhadas com o
-#  estilo visual do dashboard — ver data_loader.load_topic_coordinates)
-# ============================================================
 def render_topic_map(sistema: str, topico_selecionado: int | None):
     coords = dl.load_topic_coordinates(sistema)
     tabela = dl.build_topic_table(sistema)
     cor = COR_SISTEMA.get(sistema, "#2B6CB0")
 
     if coords is None or coords.empty:
-        # Fallback: layout circular simples baseado apenas em volume,
-        # caso o intertopic_map.html ainda não tenha sido gerado para este sistema.
         import numpy as np
         n = len(tabela)
         if n == 0:
@@ -215,9 +196,6 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
 
     import numpy as _np
     raw = merged["n_documentos"].clip(lower=1).values.astype(float)
-    # Normaliza para [1, 10] com raiz quadrada para comprimir outliers,
-    # depois usa sizemode="area" com sizeref pequeno para que as diferenças
-    # de volume sejam claramente visíveis sem que os círculos se sobreponham.
     sqrt_vals = _np.sqrt(raw)
     vmin, vmax = sqrt_vals.min(), sqrt_vals.max()
     if vmax > vmin:
@@ -266,9 +244,7 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
     return fig
 
 
-# ============================================================
 # COMPONENTES — CARTÃO DE DIAGNÓSTICO DO TÓPICO
-# ============================================================
 def render_topic_card(sistema: str, topico: int | None):
     if topico is None:
         return html.Div(
@@ -312,9 +288,7 @@ def render_topic_card(sistema: str, topico: int | None):
     )
 
 
-# ============================================================
 # COMPONENTES — RANKING DE GARGALOS
-# ============================================================
 def render_ranking_chart(sistema: str, topico_selecionado: int | None):
     tabela = dl.build_topic_table(sistema).sort_values("n_documentos", ascending=True)
     cor = COR_SISTEMA.get(sistema, "#2B6CB0")
@@ -365,9 +339,8 @@ def render_ranking_chart(sistema: str, topico_selecionado: int | None):
     return fig
 
 
-# ============================================================
 # COMPONENTES — EVOLUÇÃO TEMPORAL
-# ============================================================
+
 def render_timeline(sistema: str, topico_selecionado: int | None):
     tabela = dl.build_topic_table(sistema)
     cor_base = COR_SISTEMA.get(sistema, "#2B6CB0")
@@ -401,7 +374,7 @@ def render_timeline(sistema: str, topico_selecionado: int | None):
             hovertemplate="%{x|%b/%Y}<br><b>%{y} chamados</b><extra></extra>",
         ))
     else:
-        # Total agregado por mês, somando todos os tópicos
+        # total agregado por mês, somando todos os tópicos
         total = agg.groupby("mes_ano")["n_chamados"].sum().reset_index()
         fig.add_trace(go.Scatter(
             x=total["mes_ano"], y=total["n_chamados"],
@@ -426,9 +399,7 @@ def render_timeline(sistema: str, topico_selecionado: int | None):
     return fig
 
 
-# ============================================================
 # COMPONENTES — TABELA COMPLETA
-# ============================================================
 def render_full_table(sistema: str):
     tabela = dl.build_topic_table(sistema).sort_values("n_documentos", ascending=False)
     display = tabela[["topico", "titulo", "n_documentos", "padrao_dominante", "impacto_operacional"]].copy()
@@ -472,9 +443,7 @@ def render_full_table(sistema: str):
     )
 
 
-# ============================================================
 # COMPONENTES DO CHATBOT (UI)
-# ============================================================
 def get_initial_message():
     global chatbot_status
     msgs = [
@@ -494,7 +463,6 @@ def get_initial_message():
         )
     ]
 
-    # A mensagem de carregamento sempre faz parte do histórico inicial
     status_str = str(chatbot_status) if chatbot_status else ""
     msgs.append(
         html.Div(
@@ -554,9 +522,7 @@ chatbot_offcanvas = dbc.Offcanvas(
 )
 
 
-# ============================================================
 # LAYOUT PRINCIPAL
-# ============================================================
 app.layout = html.Div(
     [
         dcc.Store(id="store-sistema", data=dl.SISTEMAS[0]),
@@ -666,9 +632,7 @@ app.layout = html.Div(
 )
 
 
-# ============================================================
 # CALLBACKS DO CHATBOT E CLIENTSIDE
-# ============================================================
 app.clientside_callback(
     """
     function(children) {
@@ -803,7 +767,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
 
     trigger_id = ctx.triggered[0]["prop_id"]
 
-    # Se o sistema mudou (mudança de aba), reseta tudo!
+    # sistema mudou, reseta tudo
     if "store-sistema" in trigger_id:
         return get_initial_message(), "", 3, None, 0
 
@@ -940,7 +904,6 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
 
     chat_history.append(bot_response)
 
-    # Calculo matemático do peso do histórico
     peso_historico = len(str(chat_history))
 
     return chat_history, "", chat_top, chat_time, peso_historico
@@ -957,11 +920,7 @@ def clear_chat_history(submit_n_clicks):
     return dash.no_update, dash.no_update
 
 def _extrair_topico_customdata(point: dict, indice: int | None = None):
-    """
-    Extrai o tópico de um ponto clicado no Plotly, de forma defensiva.
-    customdata pode chegar como escalar, lista, ou estar ausente
-    dependendo da versão do plotly.js e de qual elemento foi clicado.
-    """
+
     cd = point.get("customdata")
     if cd is None:
         return None
@@ -969,7 +928,6 @@ def _extrair_topico_customdata(point: dict, indice: int | None = None):
         if indice is not None and indice < len(cd):
             return cd[indice]
         return cd[0] if cd else None
-    # customdata veio como escalar direto
     return cd
 
 
@@ -991,13 +949,13 @@ def atualizar_selecao(n_clicks_list, map_click, ranking_click, active_cells, tab
 
     trigger_id = ctx.triggered[0]["prop_id"]
 
-    # Troca de sistema -> reseta o tópico selecionado
+    # troca de sistema -> reseta o tópico selecionado
     if "system-item" in trigger_id and any(n_clicks_list):
         import json as _json
         sistema = _json.loads(trigger_id.split(".")[0])["index"]
         return sistema, None
 
-    # Clique no mapa de tópicos
+    # clique no mapa de tópicos
     if "topic-map" in trigger_id and map_click:
         points = map_click.get("points") or []
         if points:
@@ -1006,7 +964,7 @@ def atualizar_selecao(n_clicks_list, map_click, ranking_click, active_cells, tab
                 return dash.no_update, topico
         return dash.no_update, dash.no_update
 
-    # Clique no ranking
+    # clique no ranking
     if "ranking-chart" in trigger_id and ranking_click:
         points = ranking_click.get("points") or []
         if points:
@@ -1015,7 +973,7 @@ def atualizar_selecao(n_clicks_list, map_click, ranking_click, active_cells, tab
                 return dash.no_update, topico
         return dash.no_update, dash.no_update
 
-    # Clique em uma linha da tabela completa
+    # clique em uma linha da tabela completa
     if "full-table-datatable" in trigger_id and active_cells:
         for cell, data in zip(active_cells, table_data_list):
             if cell:
@@ -1044,10 +1002,6 @@ def atualizar_destacado(sistema_ativo):
             )
         )
     return items
-
-
-
-
 
 @app.callback(
     Output("page-title", "children"),

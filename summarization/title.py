@@ -1,31 +1,14 @@
-"""
-Titulação Iterativa de Tópicos — Llama 3.1 (Ollama local)
-==========================================================
-Lê os resumos gerados pelo detailed_summarization.py e atribui
-um título único a cada tópico, por sistema.
-
-Estratégia (Opção B):
-  - Tópicos titulados um por vez
-  - Cada chamada recebe os títulos já atribuídos como contexto proibido
-  - Garante distinção mesmo entre tópicos com conteúdo próximo
-
-Saída: titulo_topic_{N}.txt por tópico, na mesma pasta dos resumos.
-"""
-
 import os
 import ollama
 
-# ============================================================
-# CONFIGURAÇÕES
-# ============================================================
 MODEL = "llama3.1:8b-instruct-q4_K_S"
 
 OLLAMA_OPTIONS = {
-    "temperature": 0.3,   # ligeiramente mais criativo para variar títulos
+    "temperature": 0.3,
     "top_p":       0.9,
     "num_gpu":     99,
     "num_ctx":     4096,
-    "num_predict": 50,    # título curto — não precisa de mais
+    "num_predict": 50,
 }
 
 K_POR_SISTEMA = {
@@ -39,9 +22,7 @@ K_POR_SISTEMA = {
 RESUMOS_DIR = "outLLM/detailed_summarization"
 
 
-# ============================================================
 # PROMPT
-# ============================================================
 SYSTEM_PROMPT = """\
 You are a topic labeling specialist for Brazilian government IT support systems.
 You will receive the summary of one topic cluster and must generate a single short title for it.
@@ -59,10 +40,6 @@ Do not reuse suffix patterns or structural templates from previously used titles
 Output ONLY the title. No quotes, no numbering, no explanation.
 """
 
-
-# ============================================================
-# CHAMADA AO MODELO
-# ============================================================
 def chamar_ollama(prompt: list[dict]) -> str:
     response = ollama.chat(
         model=MODEL,
@@ -87,7 +64,7 @@ def get_titulo(resumo: str, titulos_usados: list[str], sis: str, t: int) -> str:
 
     titulo = chamar_ollama(prompt).strip().strip('"').strip("'")
 
-    # Remove numeração acidental (ex: "1. Título")
+    # Remove numeração
     if titulo and titulo[0].isdigit():
         titulo = titulo.lstrip("0123456789. ").strip()
 
@@ -98,9 +75,6 @@ def get_titulo(resumo: str, titulos_usados: list[str], sis: str, t: int) -> str:
     return titulo
 
 
-# ============================================================
-# PERSISTÊNCIA
-# ============================================================
 def load_resumo(sistema: str, topic: int) -> str | None:
     path = f"{RESUMOS_DIR}/{sistema}/summary_topic_{topic}.txt"
     if not os.path.exists(path):
@@ -127,10 +101,6 @@ def load_titulo(sistema: str, topic: int) -> str | None:
 def titulo_done(sistema: str, topic: int) -> bool:
     return load_titulo(sistema, topic) is not None
 
-
-# ============================================================
-# LOOP PRINCIPAL
-# ============================================================
 def run() -> None:
     print("=" * 60)
     print("  TITULAÇÃO ITERATIVA — LLAMA 3.1 (OLLAMA LOCAL)")
@@ -141,7 +111,6 @@ def run() -> None:
         print(f"  SISTEMA: {sis} ({k} tópicos)")
         print(f"{'=' * 60}")
 
-        # Pré-popula com títulos já gerados (permite retomar sem quebrar contexto)
         titulos_usados: list[str] = []
         for t in range(k):
             titulo_existente = load_titulo(sis, t)

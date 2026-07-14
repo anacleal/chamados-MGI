@@ -30,7 +30,6 @@ def preprocess_text(text, stopwords_pt, nomes):
 
     text = normalize(text)
 
-    # Remove expressões compostas antes da tokenização
     expressoes_remover = ['bom dia', 'boa tarde', 'boa noite',]
     for expr in expressoes_remover:
         text = text.replace(expr, ' ')
@@ -54,11 +53,9 @@ def preprocess_text(text, stopwords_pt, nomes):
         if token in nomes:
             continue
 
-
         if all(char == 'x' for char in token):
             continue
 
-        # substitui os numeros por X
         if any(char.isdigit() for char in token):
             continue
 
@@ -94,7 +91,6 @@ def process_original_file(input_path, output_path, names_path):
             print(f" -> Limpando coluna: {original_col}...")
             df[original_col] = df[original_col].apply(lambda x: preprocess_text(x, stopwords_pt, nomes))
 
-    # Salva a base inteira, limpa e pronta para o Bash
     df.to_csv(output_path, index=False, encoding="utf-8")
     print(f"Concluído! Base mestre salva em: {output_path}")
 

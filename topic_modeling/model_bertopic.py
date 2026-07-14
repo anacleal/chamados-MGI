@@ -1,22 +1,6 @@
-"""
-BERTopic - Modelagem de Tópicos para Chamados de Suporte
-=========================================================
-Reprodutibilidade garantida via seeds fixas em todos os componentes estocásticos.
-O número de tópicos por sistema foi determinado pelo método do cotovelo (inércia do KMeans).
-Os hiperparâmetros do UMAP são selecionados via Grid Search usando o Índice de Silhueta.
-
-Seeds fixas aplicadas em:
-  - numpy       (SEED)
-  - Python random (SEED)
-  - PyTorch     (SEED)
-  - UMAP        (random_state=SEED)
-  - KMeans      (random_state=SEED)
-"""
-
 import random
 import os
 import json
-import itertools
 
 import numpy as np
 import pandas as pd
@@ -26,14 +10,10 @@ import seaborn as sns
 
 from bertopic import BERTopic as BERTopic_
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 from umap import UMAP
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from sentence_transformers import SentenceTransformer
 
-# ---------------------------------------------------------------------------
-# Reprodutibilidade global
-# ---------------------------------------------------------------------------
 SEED = 42
 
 random.seed(SEED)
@@ -42,12 +22,8 @@ torch.manual_seed(SEED)
 if torch.cuda.is_available():
     torch.cuda.manual_seed_all(SEED)
 
-# ---------------------------------------------------------------------------
-# Configurações globais
-# ---------------------------------------------------------------------------
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Número de tópicos determinado pelo método do cotovelo para cada sistema
 K_POR_SISTEMA = {
     "SIASS":  6,
     "SOUGOV": 5,
@@ -56,26 +32,10 @@ K_POR_SISTEMA = {
     "TOTAIS": 10,
 }
 
-# Grade de hiperparâmetros do UMAP avaliada via Índice de Silhueta
-# n_neighbors: controla o balanço entre estrutura local e global
-# n_components: dimensionalidade do espaço reduzido antes do KMeans
-# metric: função de distância usada pelo UMAP
-UMAP_PARAM_GRID = {
-    "n_neighbors":  [15, 30, 50],
-    "n_components": [5, 10, 15],
-    "metric":       ["cosine", "euclidean"],
-}
-
 COL_TEXTO = "Descrição do chamado"
 COL_ID    = "Id"
 
-
-# ---------------------------------------------------------------------------
-# Classe BERTopic estendida
-# ---------------------------------------------------------------------------
 class BERTopic(BERTopic_):
-    """BERTopic com métodos auxiliares de persistência e análise de tópicos dominantes."""
-
     def __init__(self, device: str = DEVICE, **kwargs):
         self.device = device
         super().__init__(**kwargs)
@@ -150,22 +110,6 @@ class BERTopic(BERTopic_):
             print(f"  Erro ao calcular tópicos dominantes: {e}")
 
     def save_topic_coordinates_2d(self, output_dir: str) -> None:
-        """
-        Calcula e salva coordenadas 2D dos tópicos a partir dos embeddings
-        SEMÂNTICOS reais (topic_embeddings_), e não do c-TF-IDF léxico usado
-        pelo visualize_topics() nativo do BERTopic.
-
-        Isso é intencional: como o clustering deste projeto (KMeans + UMAP)
-        já opera sobre os embeddings semânticos do SentenceTransformer, a
-        distância entre tópicos no mapa deve refletir a mesma noção de
-        similaridade — caso contrário, tópicos formados como semanticamente
-        distintos podem aparecer artificialmente próximos no c-TF-IDF (termos
-        de domínio restrito e vocabulário compartilhado entre chamados de TI
-        tendem a deixar o c-TF-IDF "genérico").
-
-        Usa um UMAP 2D dedicado, com a mesma SEED do projeto, separado do
-        UMAP usado para o clustering (que reduz para 5-15 componentes).
-        """
         os.makedirs(output_dir, exist_ok=True)
 
         topic_embeddings = getattr(self, "topic_embeddings_", None)
@@ -177,22 +121,12 @@ class BERTopic(BERTopic_):
         topic_ids  = topic_info["Topic"].tolist()
         topic_sizes = dict(zip(topic_info["Topic"], topic_info["Count"]))
 
-        # Remove o tópico -1 (outliers) antes de calcular o layout 2D,
-        # para não distorcer a projeção com um cluster artificial de "lixo"
-        mask = [t != -1 for t in topic_ids]
         ids_validos  = [t for t, m in zip(topic_ids, mask) if m]
         emb_validos  = np.array(topic_embeddings)[mask]
 
         if len(ids_validos) < 3:
             print("  [AVISO] Poucos tópicos válidos para projeção 2D — pulei.")
             return
-
-        # Com poucos tópicos (5-10, como neste projeto), n_neighbors precisa
-        # ser BEM menor que o padrão (15) usado no clustering principal —
-        # caso contrário o UMAP "acha" quase todo mundo vizinho de todo mundo
-        # e a projeção 2D perde a separação entre grupos de tópicos distintos,
-        # ficando com aparência genérica/sem estrutura. n_neighbors=2 preserva
-        # vizinhança local mesmo com poucos pontos.
         n_neighbors_2d = max(2, min(len(ids_validos) - 1, 2))
 
         umap_2d = UMAP(
@@ -215,82 +149,46 @@ class BERTopic(BERTopic_):
         print(f"  Coordenadas 2D (embeddings semânticos) salvas em {output_dir}/topic_coordinates_2d.csv")
 
 
-# ---------------------------------------------------------------------------
-# Pipeline principal
-# ---------------------------------------------------------------------------
+def _carregar_umap_params(results_dir: str) -> dict:
+    tuned_path = os.path.join(results_dir, "melhores_parametros_umap.json")
+    if not os.path.exists(tuned_path):
+        raise FileNotFoundError(
+            f"Parâmetros do UMAP não encontrados em {tuned_path}. "
+            f"Rode tuning_bertopic.py para esse sistema antes de treinar o modelo final."
+        )
+    with open(tuned_path, "r", encoding="utf-8") as f:
+        params = json.load(f)
+    print(f"  Usando parâmetros UMAP tunados: {params}")
+    return params
+
+
 def run_bertopic(docs: list, ids: list, sistema_nome: str, nr_topics: int) -> BERTopic:
     print(f"\n--- [{sistema_nome}] {nr_topics} tópicos | device: {DEVICE.upper()} ---")
 
     model_dir   = f"models/{sistema_nome}"
     model_path  = f"{model_dir}/modelo"
     results_dir = f"bertopic_resultados/{sistema_nome}"
-    graph_dir   = f"bertopic_graphs/{sistema_nome}"
 
-    for d in (model_dir, results_dir, graph_dir):
+    for d in (model_dir, results_dir):
         os.makedirs(d, exist_ok=True)
 
-    # Carrega modelo existente ou treina do zero
+    umap_params = None
+
     if os.path.exists(model_path) and os.path.exists(f"{model_path}/config.json"):
         print(f"  Modelo encontrado em {model_path}. Carregando...")
         topic_model = BERTopic.load(model_path)
-        melhores_params = None  # params já foram salvos na execução original
 
     else:
-        # Embeddings calculados uma única vez e reutilizados em todo o grid
-        print(f"  Pré-calculando embeddings com SentenceTransformer no {DEVICE.upper()}...")
+        umap_params = _carregar_umap_params(results_dir)
+
+        print(f"  Calculando embeddings com SentenceTransformer no {DEVICE.upper()}...")
         embedding_model = SentenceTransformer(
             "paraphrase-multilingual-MiniLM-L12-v2", device=DEVICE
         )
         embeddings = embedding_model.encode(docs, show_progress_bar=True)
 
-        # --- Grid Search via Índice de Silhueta ---
-        keys, values  = zip(*UMAP_PARAM_GRID.items())
-        combinacoes   = [dict(zip(keys, v)) for v in itertools.product(*values)]
-        n_combinacoes = len(combinacoes)
-
-        print(f"  Iniciando Grid Search ({n_combinacoes} combinações)...")
-
-        melhor_silhueta = -1.0
-        melhores_params = None
-        resultados_grid = []
-
-        for idx, config in enumerate(combinacoes, start=1):
-            umap_model   = UMAP(**config, min_dist=0.0, random_state=SEED)
-            kmeans_model = KMeans(n_clusters=nr_topics, random_state=SEED, n_init=10)
-
-            # Modelo leve para avaliação: sem representation_model para ganhar velocidade
-            test_model = BERTopic(
-                device=DEVICE,
-                embedding_model=embedding_model,
-                umap_model=umap_model,
-                hdbscan_model=kmeans_model,
-                nr_topics=nr_topics,
-                verbose=False,
-            )
-            test_model.fit_transform(docs, embeddings)
-
-            # Silhueta calculada no espaço UMAP reduzido
-            reduced_emb = test_model.umap_model.transform(embeddings)
-            labels      = np.array(test_model.topics_)
-            silhueta    = round(float(silhouette_score(reduced_emb, labels)), 4)
-
-            resultados_grid.append({**config, "silhouette_score": silhueta})
-            print(f"    [{idx}/{n_combinacoes}] {config} -> Silhueta: {silhueta}")
-
-            if silhueta > melhor_silhueta:
-                melhor_silhueta = silhueta
-                melhores_params = config
-
-        print(f"  > Melhor configuração: {melhores_params} | Silhueta: {melhor_silhueta}")
-
-        # Salva tabela completa do grid para o artigo
-        pd.DataFrame(resultados_grid).to_csv(
-            f"{results_dir}/grid_search_resultados.csv", index=False
-        )
-
-        # --- Treinamento definitivo com os melhores parâmetros ---
         print("  Treinando modelo definitivo...")
-        umap_final   = UMAP(**melhores_params, min_dist=0.0, random_state=SEED)
+        umap_final   = UMAP(**umap_params, min_dist=0.0, random_state=SEED)
         kmeans_final = KMeans(n_clusters=nr_topics, random_state=SEED, n_init=20)
 
         representation_model = {
@@ -310,42 +208,18 @@ def run_bertopic(docs: list, ids: list, sistema_nome: str, nr_topics: int) -> BE
         )
         topic_model.fit_transform(docs, embeddings)
 
-        # Silhueta do modelo definitivo
-        final_reduced   = topic_model.umap_model.transform(embeddings)
-        final_labels    = np.array(topic_model.topics_)
-        silhueta_final  = round(float(silhouette_score(final_reduced, final_labels)), 4)
-
-        with open(f"{results_dir}/metricas_validacao.json", "w", encoding="utf-8") as f:
-            json.dump({
-                "silhouette_score":        silhueta_final,
-                "melhores_parametros_umap": melhores_params,
-            }, f, ensure_ascii=False, indent=4)
-
         print(f"  Salvando modelo em {model_path}...")
         topic_model.save(model_path, serialization="safetensors", save_ctfidf=True)
 
-    # Persistência de resultados
+    # Persistência de resultados essenciais ao dashboard
     topic_model.save_txt(   f"{results_dir}/topicos.txt")
     topic_model.save_json(  f"{results_dir}/topicos.json")
-    topic_model.save_params(f"{results_dir}/parametros.json", umap_params=melhores_params)
+    topic_model.save_params(f"{results_dir}/parametros.json", umap_params=umap_params)
     topic_model.dominant_topics(docs, results_dir, ids)
     topic_model.save_topic_coordinates_2d(results_dir)
 
-    # Visualizações interativas
-    try:
-        topic_model.visualize_topics()                          .write_html(f"{graph_dir}/intertopic_map.html")
-        topic_model.visualize_barchart(top_n_topics=nr_topics)  .write_html(f"{graph_dir}/bar_graphs.html")
-        topic_model.visualize_hierarchy()                       .write_html(f"{graph_dir}/hierarchy.html")
-        topic_model.get_topic_info()                            .to_csv(    f"{graph_dir}/topic_info.csv", index=False)
-    except Exception as e:
-        print(f"  Erro ao gerar visualizações: {e}")
-
     return topic_model
 
-
-# ---------------------------------------------------------------------------
-# Entrada
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     for sistema, k in K_POR_SISTEMA.items():
         csv_path = f"../data/chamados_{sistema.lower()}.csv"

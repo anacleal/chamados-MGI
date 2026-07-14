@@ -5,13 +5,10 @@ import random
 import pandas as pd
 import ollama
 
-# ============================================================
-# CONFIGURAÇÕES
-# ============================================================
 MODEL = "llama3.1:8b-instruct-q4_K_S"
 
 MAX_OUTPUT_TOKENS = 1000
-NUM_CTX           = 8192   # contexto maior — cabe os 45 docs de uma vez
+NUM_CTX           = 8192
 
 OLLAMA_OPTIONS = {
     "temperature": 0.05,
@@ -21,7 +18,6 @@ OLLAMA_OPTIONS = {
     "num_predict": MAX_OUTPUT_TOKENS,
 }
 
-# Número de tópicos por sistema — espelha K_POR_SISTEMA do model_bertopic.py
 K_POR_SISTEMA = {
     "SIASS":  6,
     "SIAPE":  8,
@@ -36,12 +32,7 @@ N_PERIFERIA = 15   # documentos aleatórios dentre os restantes do mesmo tópico
 
 SEED = 42
 
-
-# ============================================================
-# CARREGAMENTO E SELEÇÃO DE DADOS
-# ============================================================
 def load_keywords(sistema: str, topic: int) -> list[str]:
-    """Carrega palavras-chave do tópico geradas pelo BERTopic."""
     json_path = f'../topic_modeling/bertopic_resultados/{sistema}/topicos.json'
     if not os.path.exists(json_path):
         return []
@@ -66,7 +57,6 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
     id_col = 'Id' if 'Id' in df.columns else 'id'
     df[id_col] = df[id_col].astype(str)
 
-    # Detecta coluna de texto
     col_texto = None
     for candidato in ['Descrição do chamado', 'Descrição do chamado_y', 'Descrição do chamado_x']:
         if candidato in df.columns:
@@ -81,7 +71,7 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
         print(f"  [AVISO] Coluna de descrição não encontrada para {sistema}.")
         return [], []
 
-    # --- Tenta usar Topicos_Dominantes.csv (com probabilidades) ---
+    #Topicos_Dominantes.csv (com probabilidades)
     col_prob = f'Topico {topic}'
 
     if os.path.exists(td_path):
@@ -118,7 +108,7 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
                 print(f"    Seleção via probabilidade: {len(nucleo)} núcleo + {len(periferia)} periferia")
                 return nucleo, periferia
 
-    # --- Fallback: Resumo_Topicos_Dominantes.csv (sem probabilidade) ---
+    #(sem probabilidade)
     if os.path.exists(rdt_path):
         print(f"  [AVISO] Topicos_Dominantes.csv sem coluna '{col_prob}' — usando fallback sem ranking.")
         rdt = pd.read_csv(rdt_path)
@@ -140,9 +130,7 @@ def load_data(sistema: str, topic: int) -> tuple[list[str], list[str]]:
     return [], []
 
 
-# ============================================================
-# PROMPT DE SUMARIZAÇÃO
-# ============================================================
+# PROMPT
 
 SYSTEM_PROMPT = """\
 You are a data analysis pipeline specialized in identifying operational bottlenecks in Brazilian \
@@ -192,9 +180,7 @@ Do not describe consequences here — save those for Impacto Operacional.]
 """
 
 
-# ============================================================
 # SUMARIZAÇÃO
-# ============================================================
 def chamar_ollama(prompt: list[dict]) -> str:
     response = ollama.chat(
         model=MODEL,
@@ -205,13 +191,12 @@ def chamar_ollama(prompt: list[dict]) -> str:
 
 
 def validar_resposta(text: str) -> bool:
-    """Verifica se a resposta contém os três campos esperados."""
     campos = ["**Padrão Dominante**", "**Impacto Operacional**"]
     return all(campo in text for campo in campos)
 
 
 def formatar_chamados(nucleo: list[str], periferia: list[str]) -> str:
-    """Monta o bloco de chamados para o prompt, separando núcleo e periferia."""
+    #Monta o bloco de chamados para o prompt, separando núcleo e periferia.
     linhas = ["=== NÚCLEO (mais representativos do tópico) ==="]
     for i, c in enumerate(nucleo, 1):
         linhas.append(f"Chamado N{i}: {c}")
@@ -225,7 +210,6 @@ def formatar_chamados(nucleo: list[str], periferia: list[str]) -> str:
 
 
 def get_summary(nucleo: list[str], periferia: list[str], keywords: list[str], sis: str, t: int) -> str:
-    """Gera o resumo estruturado em uma única chamada ao modelo."""
     kw_str     = ", ".join(f"'{w}'" for w in keywords) if keywords else "(não disponível)"
     chamados   = formatar_chamados(nucleo, periferia)
 
@@ -267,13 +251,10 @@ def load_saved_summary(sistema: str, topic: int) -> str | None:
 
 
 def already_done(sistema: str, topic: int) -> bool:
-    """Permite retomar de onde parou."""
     return load_saved_summary(sistema, topic) is not None
 
 
-# ============================================================
-# LOOP PRINCIPAL
-# ============================================================
+
 def run() -> None:
     print("=" * 60)
     print("  SUMARIZAÇÃO DETALHADA — LLAMA 3.1 (OLLAMA LOCAL)")
