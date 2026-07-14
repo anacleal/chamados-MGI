@@ -15,7 +15,7 @@ def get_stopwords_formatadas():
     # lista de stopwords normalizadas
     stopwords_pt = {normalize(w) for w in stopwords.words('portuguese')}
     custom_stops = ['ola', 'oi', 'saudacoes', 'senhores', 'senhoras', 'cordialmente', 'att', 'atenciosamente', 'id', 'nome',
-                    'siape', 'sigepe', 'siass', 'sougov', 'bom', 'boa', 'dia', 'tarde', 'noite', 'nao']
+                    'nao']
     stopwords_pt.update(custom_stops)
     return stopwords_pt
 
@@ -31,7 +31,7 @@ def preprocess_text(text, stopwords_pt, nomes):
     text = normalize(text)
 
     # Remove expressões compostas antes da tokenização
-    expressoes_remover = ['bom dia', 'boa tarde', 'boa noite', 'sou gov',]
+    expressoes_remover = ['bom dia', 'boa tarde', 'boa noite',]
     for expr in expressoes_remover:
         text = text.replace(expr, ' ')
 
@@ -46,9 +46,6 @@ def preprocess_text(text, stopwords_pt, nomes):
     resultado = []
 
     for token in tokens:
-        if token == "nao":
-            #resultado.append("nao")
-            continue
 
         #remove stopwords
         if token in stopwords_pt or token in nomes or token.startswith("prezad") or token.startswith("servidor"):
@@ -103,7 +100,7 @@ def process_original_file(input_path, output_path, names_path):
 
 
 if __name__ == "__main__":
-    INPUT_CSV = "../data/base_de_dados_a.csv"
+    INPUT_CSV = "../data/chatbot_table.csv"
     OUTPUT_CSV = "../data/base_de_dados.csv"
     NAMES_FILE = "../data/nomes_formatados.txt"
 
