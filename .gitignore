@@ -9,3 +9,6 @@
 /.idea/
 /chatbot/artifacts
 /chatbot/models
+/summarization/revisao_topicos.xlsx
+cloudflared.exe
+config.yml
