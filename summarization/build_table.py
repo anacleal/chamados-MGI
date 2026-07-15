@@ -47,7 +47,7 @@ rows = []
 for sis, k in K_POR_SISTEMA.items():
     for t in range(k):
         base = f"{RESUMOS_DIR}/{sis}"
-        titulo  = load_file(f"{base}/titulo_topic_{t}.txt") or ""
+        titulo  = load_file(f"{base}/teste_titulo_topic_{t}.txt") or ""
         resumo  = load_file(f"{base}/summary_topic_{t}.txt") or ""
         padrao, impacto = parse_resumo(resumo)
         n_docs = count_docs(sis, t)
@@ -124,6 +124,6 @@ ws.freeze_panes = "A2"
 # Auto-filtro
 ws.auto_filter.ref = f"A1:{get_column_letter(len(HEADERS))}1"
 
-out = os.path.join(os.path.dirname(__file__), "revisao_topicos.xlsx")
+out = os.path.join(os.path.dirname(__file__), "teste_revisao_topicos.xlsx")
 wb.save(out)
 print(f"Salvo em {out}")

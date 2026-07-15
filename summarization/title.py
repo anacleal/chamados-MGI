@@ -49,17 +49,10 @@ def chamar_ollama(prompt: list[dict]) -> str:
     return response["message"]["content"].strip()
 
 
-def get_titulo(resumo: str, titulos_usados: list[str], sis: str, t: int) -> str:
-    proibidos = ""
-    if titulos_usados:
-        lista = "\n".join(f"- {titulo}" for titulo in titulos_usados)
-        proibidos = f"[ALREADY USED TITLES — DO NOT REPEAT OR PARAPHRASE]\n{lista}\n\n"
-
-    user_content = f"{proibidos}[TOPIC SUMMARY]\n{resumo}"
-
+def get_titulo(resumo: str, sis: str, t: int) -> str:
     prompt = [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user",   "content": user_content},
+        {"role": "user",   "content": f"[TOPIC SUMMARY]\n{resumo}"},
     ]
 
     titulo = chamar_ollama(prompt).strip().strip('"').strip("'")
@@ -103,19 +96,13 @@ def titulo_done(sistema: str, topic: int) -> bool:
 
 def run() -> None:
     print("=" * 60)
-    print("  TITULAÇÃO ITERATIVA — LLAMA 3.1 (OLLAMA LOCAL)")
+    print("  TITULAÇÃO — LLAMA 3.1 (OLLAMA LOCAL)")
     print("=" * 60)
 
     for sis, k in K_POR_SISTEMA.items():
         print(f"\n{'=' * 60}")
         print(f"  SISTEMA: {sis} ({k} tópicos)")
         print(f"{'=' * 60}")
-
-        titulos_usados: list[str] = []
-        for t in range(k):
-            titulo_existente = load_titulo(sis, t)
-            if titulo_existente:
-                titulos_usados.append(titulo_existente)
 
         for t in range(k):
             prefixo = f"[{sis} | Tópico {t}/{k - 1}]"
@@ -129,11 +116,11 @@ def run() -> None:
                 print(f"  {prefixo} → resumo não encontrado, pulando.")
                 continue
 
-            print(f"  {prefixo} → gerando título ({len(titulos_usados)} títulos já usados)...")
+            print(f"  {prefixo} → gerando título...")
+
             try:
-                titulo = get_titulo(resumo, titulos_usados, sis, t)
+                titulo = get_titulo(resumo, sis, t)
                 save_titulo(titulo, sis, t)
-                titulos_usados.append(titulo)
                 print(f"  {prefixo} → '{titulo}'")
             except Exception as e:
                 print(f"  {prefixo} → ERRO: {e}")
@@ -141,7 +128,6 @@ def run() -> None:
     print("\n" + "=" * 60)
     print("  Concluído.")
     print("=" * 60)
-
 
 if __name__ == "__main__":
     run()

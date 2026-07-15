@@ -12,3 +12,5 @@
 /summarization/revisao_topicos.xlsx
 cloudflared.exe
 config.yml
+__pycache__/
+*.pyc
