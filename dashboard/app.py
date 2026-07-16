@@ -10,9 +10,9 @@ import dash_auth
 
 import data_loader as dl
 
-chatbot_path = Path(__file__).resolve().parent.parent / "chatbot"
-if str(chatbot_path) not in sys.path:
-    sys.path.append(str(chatbot_path))
+recomendador_path = Path(__file__).resolve().parent.parent / "recomendador"
+if str(recomendador_path) not in sys.path:
+    sys.path.append(str(recomendador_path))
 
 recommender = None
 chatbot_status = "Carregando"
@@ -26,8 +26,8 @@ def load_chatbot_background():
         import os
         from pathlib import Path
         base_dir = Path(__file__).resolve().parent.parent
-        path_topicos = base_dir / 'data' / 'chatbot' / 'df_topicos.csv'
-        path_chamados = base_dir / 'data' / 'chatbot' / 'df_chamados.csv'
+        path_topicos = base_dir / 'data' / 'recomendador' / 'df_topicos.csv'
+        path_chamados = base_dir / 'data' / 'recomendador' / 'df_chamados.csv'
 
         if not (os.path.exists(path_topicos) and os.path.exists(path_chamados)):
             chatbot_status = "Construindo base de dados (Vetorizando chamados)..."
@@ -35,7 +35,7 @@ def load_chatbot_background():
             build_datasets.build_csvs()
             chatbot_status = "Carregando motor de busca..."
 
-        from rag_data_loader import carregar_dados as carregar_dados_chatbot  # type: ignore
+        from retrieval_data_loader import carregar_dados as carregar_dados_chatbot  # type: ignore
         from embeddings_manager import carregar_modelo_embedding, get_embeddings  # type: ignore
         from search_engine import SearchEngine  # type: ignore
         from recommender import RecommenderSystem  # type: ignore
