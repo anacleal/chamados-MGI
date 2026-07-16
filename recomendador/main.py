@@ -1,4 +1,4 @@
-from rag_data_loader import carregar_dados
+from retrieval_data_loader import carregar_dados
 from embeddings_manager import carregar_modelo_embedding, get_embeddings
 from search_engine import SearchEngine
 from recommender import RecommenderSystem

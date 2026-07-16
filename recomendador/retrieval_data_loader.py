@@ -18,8 +18,8 @@ def limpar_texto(texto):
 
 def carregar_dados():
     base_dir = Path(__file__).resolve().parent.parent
-    path_topicos = base_dir / 'data' / 'chatbot' / 'df_topicos.csv'
-    path_chamados = base_dir / 'data' / 'chatbot' / 'df_chamados.csv'
+    path_topicos = base_dir / 'data' / 'recomendador' / 'df_topicos.csv'
+    path_chamados = base_dir / 'data' / 'recomendador' / 'df_chamados.csv'
     
     # Nível 1 — Tópicos
     df_topicos = pd.read_csv(path_topicos)

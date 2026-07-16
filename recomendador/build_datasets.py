@@ -13,9 +13,9 @@ import os
 from dashboard import data_loader as dl
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-CHATBOT_DATA_DIR = BASE_DIR / "data" / "chatbot"
-CHAMADOS_CSV = CHATBOT_DATA_DIR / "df_chamados.csv"
-TOPICOS_CSV = CHATBOT_DATA_DIR / "df_topicos.csv"
+RECOMENDADOR_DATA_DIR = BASE_DIR / "data" / "recomendador"
+CHAMADOS_CSV = RECOMENDADOR_DATA_DIR / "df_chamados.csv"
+TOPICOS_CSV = RECOMENDADOR_DATA_DIR / "df_topicos.csv"
 DATA_DIR = Path(dl.DATA_DIR)
 K_POR_SISTEMA = dl.K_POR_SISTEMA
 
@@ -200,7 +200,7 @@ def build_chamados() -> pd.DataFrame:
 
 
 def build_csvs() -> tuple[Path, Path]:
-    CHATBOT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    RECOMENDADOR_DATA_DIR.mkdir(parents=True, exist_ok=True)
     df_topicos = build_topicos()
     df_chamados = build_chamados()
 
@@ -227,7 +227,7 @@ def build_csvs() -> tuple[Path, Path]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Gera os CSVs do chatbot RAG.")
+    parser = argparse.ArgumentParser(description="Gera os CSVs do recomendador.")
     parser.parse_args()
     build_csvs()
 

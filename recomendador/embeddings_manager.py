@@ -4,13 +4,13 @@ import numpy as np
 import torch
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
-from rag_data_loader import carregar_dados
+from retrieval_data_loader import carregar_dados
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def carregar_modelo_embedding():
     base_dir = Path(__file__).resolve().parent.parent
-    metadata_path = base_dir / "chatbot" / "models" / "metadata.json"
+    metadata_path = base_dir / "recomendador" / "models" / "metadata.json"
     
     caminho_modelo_local = None
     if metadata_path.exists():
@@ -31,8 +31,8 @@ def carregar_modelo_embedding():
 
 def get_embeddings(df_topicos, df_chamados, embedding_model):
     base_dir = Path(__file__).resolve().parent.parent
-    vetores_topicos_path = base_dir / "chatbot" / "artifacts" / "embeddings_topicos.npy"
-    vetores_chamados_path = base_dir / "chatbot" / "artifacts" / "embeddings_chamados.npy"
+    vetores_topicos_path = base_dir / "recomendador" / "artifacts" / "embeddings_topicos.npy"
+    vetores_chamados_path = base_dir / "recomendador" / "artifacts" / "embeddings_chamados.npy"
     
     vetores_topicos_path.parent.mkdir(parents=True, exist_ok=True)
     
