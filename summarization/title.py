@@ -4,7 +4,6 @@ Titulação Iterativa de Tópicos — Llama 3.1 (Ollama local)
 Lê os resumos gerados pelo detailed_summarization.py e atribui
 um título único a cada tópico, por sistema.
 
-Estratégia (Opção B):
   - Tópicos titulados um por vez
   - Cada chamada recebe os títulos já atribuídos como contexto proibido
   - Garante distinção mesmo entre tópicos com conteúdo próximo
