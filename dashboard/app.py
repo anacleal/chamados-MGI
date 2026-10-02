@@ -10,9 +10,9 @@ import dash_auth
 
 import data_loader as dl
 
-chatbot_path = Path(__file__).resolve().parent.parent / "chatbot"
-if str(chatbot_path) not in sys.path:
-    sys.path.append(str(chatbot_path))
+recomendador_path = Path(__file__).resolve().parent.parent / "recomendador"
+if str(recomendador_path) not in sys.path:
+    sys.path.append(str(recomendador_path))
 
 recommender = None
 chatbot_status = "Carregando"
@@ -26,8 +26,8 @@ def load_chatbot_background():
         import os
         from pathlib import Path
         base_dir = Path(__file__).resolve().parent.parent
-        path_topicos = base_dir / 'data' / 'chatbot' / 'df_topicos.csv'
-        path_chamados = base_dir / 'data' / 'chatbot' / 'df_chamados.csv'
+        path_topicos = base_dir / 'data' / 'recomendador' / 'df_topicos.csv'
+        path_chamados = base_dir / 'data' / 'recomendador' / 'df_chamados.csv'
 
         if not (os.path.exists(path_topicos) and os.path.exists(path_chamados)):
             chatbot_status = "Construindo base de dados (Vetorizando chamados)..."
@@ -35,7 +35,7 @@ def load_chatbot_background():
             build_datasets.build_csvs()
             chatbot_status = "Carregando motor de busca..."
 
-        from rag_data_loader import carregar_dados as carregar_dados_chatbot  # type: ignore
+        from retrieval_data_loader import carregar_dados as carregar_dados_chatbot  # type: ignore
         from embeddings_manager import carregar_modelo_embedding, get_embeddings  # type: ignore
         from search_engine import SearchEngine  # type: ignore
         from recommender import RecommenderSystem  # type: ignore
@@ -178,9 +178,9 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
             fig = go.Figure()
             fig.update_layout(
                 annotations=[dict(text="Sem dados de tópicos para este sistema.",
-                                   showarrow=False, font=dict(size=13, color="#5B6776"))],
+                                   showarrow=False, font=dict(size=18, color="#5B6776"))],
                 paper_bgcolor="white", plot_bgcolor="white",
-                height=420,
+                height=320,
             )
             return fig
         angles = np.linspace(0, 2 * np.pi, n, endpoint=False)
@@ -216,9 +216,9 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
         mode="markers+text",
         text=merged["topico"].astype(str),
         textposition="middle center",
-        textfont=dict(size=11, color="white", family=FONT_FAMILY),
+        textfont=dict(size=16, color="white", family=FONT_FAMILY),
         marker=dict(
-            size=sizes, sizemode="area", sizeref=size_ref, sizemin=14,
+            size=sizes, sizemode="area", sizeref=size_ref, sizemin=18,
             color=cor, opacity=opacities,
             line=dict(width=line_widths, color=line_colors),
         ),
@@ -232,9 +232,9 @@ def render_topic_map(sistema: str, topico_selecionado: int | None):
     fig.update_layout(
         paper_bgcolor="white",
         plot_bgcolor="white",
-        height=420,
-        margin=dict(l=10, r=10, t=10, b=10),
-        xaxis=dict(visible=False, zeroline=False),
+        height=380,
+        margin=dict(l=6, r=6, t=6, b=6),
+        xaxis=dict(visible=False, zeroline=False, scaleanchor="y", scaleratio=1),
         yaxis=dict(visible=False, zeroline=False),
         font=dict(family=FONT_FAMILY),
         showlegend=False,
@@ -295,7 +295,7 @@ def render_ranking_chart(sistema: str, topico_selecionado: int | None):
 
     if tabela.empty:
         fig = go.Figure()
-        fig.update_layout(height=420, paper_bgcolor="white", plot_bgcolor="white")
+        fig.update_layout(height=320, paper_bgcolor="white", plot_bgcolor="white")
         return fig
 
     colors = [
@@ -326,13 +326,13 @@ def render_ranking_chart(sistema: str, topico_selecionado: int | None):
         hovertemplate="<b>%{y}</b><br>%{x} chamados<extra></extra>",
     ))
     fig.update_layout(
-        height=max(320, 56 * len(tabela)),
+        height=max(280, 58 * len(tabela)),
         paper_bgcolor="white",
         plot_bgcolor="white",
-        margin=dict(l=20, r=30, t=10, b=40),
-        font=dict(family=FONT_FAMILY, size=13, color="#1C2530"),
-        xaxis=dict(title="Nº de chamados", gridcolor="#E2E5EA", tickfont=dict(size=12)),
-        yaxis=dict(title="", automargin=True, tickfont=dict(size=13), ticksuffix="      "),
+        margin=dict(l=16, r=24, t=6, b=32),
+        font=dict(family=FONT_FAMILY, size=18, color="#1C2530"),
+        xaxis=dict(title="Nº de chamados", gridcolor="#E2E5EA", tickfont=dict(size=17)),
+        yaxis=dict(title="", automargin=True, tickfont=dict(size=18), ticksuffix="      "),
         clickmode="event+select",
         uirevision=sistema,
     )
@@ -354,10 +354,10 @@ def render_timeline(sistema: str, topico_selecionado: int | None):
 
     if agg.empty:
         fig.update_layout(
-            height=300, paper_bgcolor="white", plot_bgcolor="white",
+            height=220, paper_bgcolor="white", plot_bgcolor="white",
             annotations=[dict(
                 text="Sem coluna de data disponível para este sistema, ou nenhum chamado encontrado.",
-                showarrow=False, font=dict(size=12, color="#5B6776"),
+                showarrow=False, font=dict(size=17, color="#5B6776"),
             )],
         )
         return fig
@@ -387,13 +387,13 @@ def render_timeline(sistema: str, topico_selecionado: int | None):
         ))
 
     fig.update_layout(
-        height=300,
+        height=260,
         paper_bgcolor="white",
         plot_bgcolor="white",
-        margin=dict(l=10, r=10, t=10, b=10),
-        font=dict(family=FONT_FAMILY, size=12, color="#1C2530"),
-        xaxis=dict(title="", gridcolor="#E2E5EA"),
-        yaxis=dict(title="Chamados / mês", gridcolor="#E2E5EA"),
+        margin=dict(l=6, r=6, t=6, b=6),
+        font=dict(family=FONT_FAMILY, size=17, color="#1C2530"),
+        xaxis=dict(title="", gridcolor="#E2E5EA", tickfont=dict(size=15)),
+        yaxis=dict(title="Chamados / mês", gridcolor="#E2E5EA", tickfont=dict(size=15)),
         showlegend=False,
     )
     return fig
@@ -413,8 +413,8 @@ def render_full_table(sistema: str):
         style_table={"overflowX": "auto"},
         style_cell={
             "fontFamily": "IBM Plex Sans, sans-serif",
-            "fontSize": "12.5px",
-            "padding": "10px 12px",
+            "fontSize": "17px",
+            "padding": "8px 12px",
             "textAlign": "left",
             "whiteSpace": "normal",
             "height": "auto",
@@ -423,7 +423,7 @@ def render_full_table(sistema: str):
         },
         style_header={
             "fontFamily": "IBM Plex Mono, monospace",
-            "fontSize": "10.5px",
+            "fontSize": "15px",
             "letterSpacing": "0.05em",
             "textTransform": "uppercase",
             "color": "#5B6776",
@@ -459,7 +459,7 @@ def get_initial_message():
                 html.Br(),
                 html.Em("A busca respeita a aba de sistema selecionada no painel.")
             ],
-            style={"marginBottom": "20px", "backgroundColor": "#EBF8FF", "padding": "10px", "borderRadius": "8px", "fontSize": "14px"}
+            style={"marginBottom": "20px", "backgroundColor": "#EBF8FF", "padding": "10px", "borderRadius": "8px", "fontSize": "16px"}
         )
     ]
 
@@ -467,7 +467,7 @@ def get_initial_message():
     msgs.append(
         html.Div(
             [html.B("Sistema: "), "Aguarde, inicializando o motor de busca... (Vetorizando chamados)" if "Construindo" in status_str else "Aguarde, inicializando o motor de busca... (Carregando)"],
-            style={"marginBottom": "20px", "color": "#C53030", "fontSize": "14px"}
+            style={"marginBottom": "20px", "color": "#C53030", "fontSize": "16px"}
         )
     )
 
@@ -475,7 +475,7 @@ def get_initial_message():
         msgs.append(
             html.Div(
                 [html.B("Sistema: "), "Motor de busca carregado e pronto para uso!" if status_str == "Pronto" else f"Falha: {status_str}"],
-                style={"marginBottom": "20px", "color": "#2F855A" if status_str == "Pronto" else "#C53030", "fontSize": "14px"}
+                style={"marginBottom": "20px", "color": "#2F855A" if status_str == "Pronto" else "#C53030", "fontSize": "16px"}
             )
         )
 
@@ -736,7 +736,7 @@ def update_chatbot_status(n, chat_history, announced):
         if "pronto para uso" not in ultimo_texto and "Falha" not in ultimo_texto:
             msg = html.Div(
                 [html.B("Sistema: "), "Motor de busca carregado e pronto para uso!" if chatbot_status == "Pronto" else f"Falha: {chatbot_status}"],
-                style={"marginBottom": "20px", "color": "#2F855A" if chatbot_status == "Pronto" else "#C53030", "fontSize": "14px"}
+                style={"marginBottom": "20px", "color": "#2F855A" if chatbot_status == "Pronto" else "#C53030", "fontSize": "16px"}
             )
             chat_history.append(msg)
             return chat_history, True, True
@@ -780,7 +780,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
     chat_history.append(
         html.Div(
             [html.B("Você: "), user_text],
-            style={"marginBottom": "10px", "textAlign": "right", "color": "#2B6CB0", "fontSize": "14px"}
+            style={"marginBottom": "10px", "textAlign": "right", "color": "#2B6CB0", "fontSize": "16px"}
         )
     )
 
@@ -794,7 +794,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
                     html.Br(),
                     f"Status: {chatbot_status}. Tente novamente em alguns segundos."
                 ],
-                style={"marginBottom": "20px", "backgroundColor": "#FED7D7", "padding": "10px", "borderRadius": "8px", "fontSize": "14px"}
+                style={"marginBottom": "20px", "backgroundColor": "#FED7D7", "padding": "10px", "borderRadius": "8px", "fontSize": "16px"}
             )
         )
         return chat_history, "", chat_top, chat_time
@@ -809,7 +809,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         lista_times = [html.Li(f"{time} ({count} chamados)") for time, count in times_disponiveis.items() if str(time).strip()]
         bot_response = html.Div(
             [html.B("Recomendador: "), "Times disponíveis na base:", html.Ul(lista_times)],
-            style={"marginBottom": "20px", "fontSize": "14px"}
+            style={"marginBottom": "20px", "fontSize": "16px"}
         )
 
     elif user_text_lower.startswith('/top '):
@@ -818,12 +818,12 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
             chat_top = int(novo_top)
             bot_response = html.Div(
                 [html.B("Recomendador: "), f"Configuração atualizada! O sistema agora listará as {chat_top} melhores recomendações."],
-                style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
+                style={"marginBottom": "20px", "fontSize": "16px", "color": "#2F855A"}
             )
         else:
             bot_response = html.Div(
                 [html.B("Recomendador: "), "Erro: Por favor, informe um número válido maior que zero. (Ex: /top 5)"],
-                style={"marginBottom": "20px", "fontSize": "14px", "color": "#C53030"}
+                style={"marginBottom": "20px", "fontSize": "16px", "color": "#C53030"}
             )
 
     elif user_text_lower.startswith('/time '):
@@ -832,12 +832,12 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         if chat_time:
             bot_response = html.Div(
                 [html.B("Recomendador: "), f"Filtro de time aplicado: '{chat_time}'. As buscas agora priorizarão esse time."],
-                style={"marginBottom": "20px", "fontSize": "14px", "color": "#2F855A"}
+                style={"marginBottom": "20px", "fontSize": "16px", "color": "#2F855A"}
             )
         else:
             bot_response = html.Div(
                 [html.B("Recomendador: "), "Filtro de time removido."],
-                style={"marginBottom": "20px", "fontSize": "14px"}
+                style={"marginBottom": "20px", "fontSize": "16px"}
             )
 
     elif user_text_lower.startswith('/id '):
@@ -847,7 +847,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
         if not chamados:
             bot_response = html.Div(
                 [html.B("Recomendador: "), f"ID {id_chamado} não encontrado."],
-                style={"marginBottom": "20px", "fontSize": "14px"}
+                style={"marginBottom": "20px", "fontSize": "16px"}
             )
 
     else:
@@ -860,7 +860,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
             if chat_time: msg_filtro += f" e time '{chat_time}'"
             bot_response = html.Div(
                 [html.B("Recomendador: "), f"Não encontrei chamados similares{msg_filtro}."],
-                style={"marginBottom": "20px", "fontSize": "14px"}
+                style={"marginBottom": "20px", "fontSize": "16px"}
             )
         else:
             solucoes = []
@@ -890,9 +890,9 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
                             html.P([html.B("Descrição do Problema:"), html.Br(), desc], style={"margin": "2px 0"}),
                             html.Hr(style={"margin": "8px 0"}),
                             html.P([html.B("Solução (Ação de Acompanhamento):"), html.Br(), acao], style={"margin": "2px 0"})
-                        ], style={"padding": "10px", "backgroundColor": "#F9FAFB", "border": "1px solid #E2E8F0", "borderRadius": "5px", "marginTop": "8px", "fontSize": "13px"})
+                        ], style={"padding": "10px", "backgroundColor": "#F9FAFB", "border": "1px solid #E2E8F0", "borderRadius": "5px", "marginTop": "8px", "fontSize": "15px"})
                     ]),
-                    html.Div(html.Em(resumo_acao), style={"marginTop": "5px", "color": "#718096", "fontSize": "13px"})
+                    html.Div(html.Em(resumo_acao), style={"marginTop": "5px", "color": "#718096", "fontSize": "15px"})
                 ], style={"padding": "12px", "backgroundColor": "#fff", "border": "1px solid #E2E8F0", "borderRadius": "8px", "marginBottom": "10px", "boxShadow": "0 1px 3px rgba(0,0,0,0.05)"})
 
                 solucoes.append(card)
@@ -900,7 +900,7 @@ def chat_interaction(n_clicks, n_submit, sistema_input, user_text, chat_history,
             bot_response = html.Div([
                 html.B("Recomendador: Encontrei as seguintes soluções históricas:"),
                 html.Div(solucoes, style={"marginTop": "10px"})
-            ], style={"marginBottom": "20px", "fontSize": "14px"})
+            ], style={"marginBottom": "20px", "fontSize": "16px"})
 
     chat_history.append(bot_response)
 

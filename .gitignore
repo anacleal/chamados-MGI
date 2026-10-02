@@ -14,3 +14,4 @@ cloudflared.exe
 config.yml
 __pycache__/
 *.pyc
+/recomendador/artifacts
